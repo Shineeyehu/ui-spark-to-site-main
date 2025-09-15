@@ -48,7 +48,7 @@ export interface MoonshotStreamResponse {
 
 // 默认配置
 export const defaultMoonshotConfig: MoonshotConfig = {
-  apiKey: import.meta.env.VITE_MOONSHOT_API_KEY || 'sk-MA54Wq2TSJqIPd7fOQSRpESX05JgH0nkIQ5OdAaQAb8spr7e',
+  apiKey: import.meta.env.VITE_MOONSHOT_API_KEY || '',
   model: import.meta.env.VITE_MOONSHOT_MODEL || 'kimi-k2-0905-preview',
   baseUrl: import.meta.env.VITE_MOONSHOT_BASE_URL || 'https://api.moonshot.cn/v1'
 };
@@ -66,13 +66,13 @@ class MoonshotAPI {
    */
   private validateConfig(): void {
     if (!this.config.apiKey) {
-      throw new Error('Moonshot API Key 未配置');
+      throw new Error('Moonshot API Key 未配置。请在环境变量中设置 VITE_MOONSHOT_API_KEY，或联系管理员配置API密钥。');
     }
     if (!this.config.model) {
-      throw new Error('Moonshot Model 未配置');
+      throw new Error('Moonshot Model 未配置。请在环境变量中设置 VITE_MOONSHOT_MODEL。');
     }
     if (!this.config.baseUrl) {
-      throw new Error('Moonshot Base URL 未配置');
+      throw new Error('Moonshot Base URL 未配置。请在环境变量中设置 VITE_MOONSHOT_BASE_URL。');
     }
   }
 

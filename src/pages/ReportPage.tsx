@@ -230,6 +230,14 @@ const ReportPage = () => {
       await generateKnowledgeCardStream(analysisContent);
     } catch (error) {
       console.error('生成知识卡失败:', error);
+      // 提供更详细的错误信息
+      if (error instanceof Error) {
+        if (error.message.includes('API Key 未配置')) {
+          console.error('API配置错误，请检查环境变量设置');
+        } else if (error.message.includes('Failed to fetch')) {
+          console.error('网络连接失败，请检查网络连接或稍后重试');
+        }
+      }
     }
   };
 
