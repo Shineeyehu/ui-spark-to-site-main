@@ -22,17 +22,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "VITE_COZE_USE_JWT": "false",
-    "VITE_COZE_CLIENT_ID": "08461612714393126791235695948705.app.coze",
-    "VITE_COZE_CLIENT_SECRET": "6JdTe15fTYT2a6FLcZeZWCFbj0ashyGVAA4NiIxz4VrQBxFA",
-    "VITE_COZE_REDIRECT_URI": "https://ui-spark-to-site-main.vercel.app/oauth/callback",
-    "VITE_COZE_BOT_ID": "7546564367413379135",
-    "VITE_COZE_USER_ID": "user_123",
-    "VITE_COZE_NICKNAME": "用户",
-    "VITE_COZE_API_KEY": "pat_WJDhe5pLrsGYOyNuzTDJIQMuf3lSv5R6R0vjbb9qA448GceGAzzcRJCqz1cEzMlS",
-    "VITE_COZE_API_TOKEN": "pat_WJDhe5pLrsGYOyNuzTDJIQMuf3lSv5R6R0vjbb9qA448GceGAzzcRJCqz1cEzMlS"
-  }
+  ]
 }
