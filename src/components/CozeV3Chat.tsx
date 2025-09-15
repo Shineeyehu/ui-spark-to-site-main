@@ -220,20 +220,10 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       
       // 显示Moonshot分析结果
       if (moonshotResult) {
-        // 清理HTML标签，只保留文本内容，并限制长度
-        const cleanResult = moonshotResult.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-        const truncatedResult = cleanResult.length > 1000 ? cleanResult.substring(0, 1000) + '...' : cleanResult;
-        
-        const moonshotInfo = `🌟 **AI深度分析**
-
-${truncatedResult}
-
----
-*基于现代AI技术的命理解读*`;
-        
+        // 直接使用HTML内容，不清理标签
         initialMessages.push({
           id: 'moonshot-result',
-          content: moonshotInfo,
+          content: moonshotResult, // 直接传递HTML内容
           role: 'assistant',
           timestamp: new Date(Date.now() + 1500)
         });
@@ -844,6 +834,106 @@ ${truncatedResult}
                          alt="命理分析报告"
                          className="w-full"
                        />
+                     </div>
+                   ) : message.id === 'analysis-content' ? (
+                     // 专门为分析报告内容设计的卡片样式
+                     <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-6 shadow-lg">
+                       <div className="flex items-center mb-4">
+                         <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center mr-3">
+                           <span className="text-white text-sm font-bold">📜</span>
+                         </div>
+                         <h3 className="text-lg font-bold text-amber-900">完整命理分析报告</h3>
+                       </div>
+                       
+                       <div className="max-h-80 overflow-y-auto bg-white/70 rounded-lg p-4 border border-amber-100">
+                         <div className="text-sm leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">
+                           {message.content.split('\n').map((line, index) => {
+                             // 处理Markdown格式
+                             if (line.startsWith('## ')) {
+                               return (
+                                 <div key={index} className="font-bold text-amber-900 text-lg mb-3 mt-4 first:mt-0 border-b border-amber-300 pb-1">
+                                   {line.replace(/## /, '')}
+                                 </div>
+                               );
+                             } else if (line.startsWith('#### ')) {
+                               return (
+                                 <div key={index} className="font-semibold text-amber-800 text-base mb-2 mt-3 flex items-center">
+                                   <span className="text-amber-600 mr-2">♥</span>
+                                   {line.replace(/#### /, '')}
+                                 </div>
+                               );
+                             } else if (line.startsWith('### ')) {
+                               return (
+                                 <div key={index} className="font-semibold text-amber-800 text-base mb-2 mt-3 flex items-center">
+                                   <span className="text-amber-600 mr-2">●</span>
+                                   {line.replace(/### /, '')}
+                                 </div>
+                               );
+                             } else if (line.startsWith('**') && line.endsWith('**')) {
+                               return (
+                                 <div key={index} className="font-semibold text-amber-800 mb-2 mt-3 first:mt-0">
+                                   {line.replace(/\*\*/g, '')}
+                                 </div>
+                               );
+                             } else if (line.startsWith('- ')) {
+                               return (
+                                 <div key={index} className="ml-4 mb-1 flex items-start">
+                                   <span className="text-amber-600 mr-2">•</span>
+                                   <span>{line.substring(2)}</span>
+                                 </div>
+                               );
+                             } else if (line.startsWith('  - ')) {
+                               return (
+                                 <div key={index} className="ml-8 mb-1 flex items-start">
+                                   <span className="text-amber-500 mr-2">✈</span>
+                                   <span>{line.substring(4)}</span>
+                                 </div>
+                               );
+                             } else if (line.startsWith('---')) {
+                               return <hr key={index} className="my-3 border-amber-200" />;
+                             } else if (line.startsWith('*') && line.endsWith('*')) {
+                               return (
+                                 <div key={index} className="text-xs text-gray-500 italic mt-2">
+                                   {line.replace(/\*/g, '')}
+                                 </div>
+                               );
+                             } else if (line.trim() === '') {
+                               return <br key={index} />;
+                             } else {
+                               return (
+                                 <div key={index} className="mb-1 text-sm leading-relaxed">
+                                   {line}
+                                 </div>
+                               );
+                             }
+                           })}
+                         </div>
+                       </div>
+                       
+                       <div className="mt-4 text-xs text-amber-700 bg-amber-100 rounded-lg p-2">
+                         💡 您可以基于此报告内容向玄机子提问，获得更深入的解读
+                       </div>
+                     </div>
+                   ) : message.id === 'moonshot-result' ? (
+                     // 专门为Moonshot分析结果设计的卡片样式 - 直接渲染HTML
+                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 shadow-lg">
+                       <div className="flex items-center mb-4">
+                         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mr-3">
+                           <span className="text-white text-sm font-bold">🌟</span>
+                         </div>
+                         <h3 className="text-lg font-bold text-blue-900">AI深度分析</h3>
+                       </div>
+                       
+                       <div className="max-h-96 overflow-y-auto bg-white/70 rounded-lg p-4 border border-blue-100">
+                         <div 
+                           className="text-sm leading-relaxed prose prose-sm max-w-none"
+                           dangerouslySetInnerHTML={{ __html: message.content }}
+                         />
+                       </div>
+                       
+                       <div className="mt-4 text-xs text-blue-700 bg-blue-100 rounded-lg p-2">
+                         🤖 基于现代AI技术的命理解读，可与传统分析对比参考
+                       </div>
                      </div>
                    ) : (
                      <div className="text-sm leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">
