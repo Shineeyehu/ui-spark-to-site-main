@@ -6,7 +6,6 @@ import { marked } from "marked";
 marked.setOptions({
   breaks: true, // 支持换行符
   gfm: true, // 支持GitHub风格的markdown
-  sanitize: false, // 允许HTML标签
   smartLists: true, // 智能列表
   smartypants: true, // 智能标点
 });
@@ -22,7 +21,7 @@ export function markdownToHtml(markdown: string): string {
   }
 
   try {
-    return marked(markdown);
+    return marked.parse(markdown);
   } catch (error) {
     console.error("Markdown转换失败:", error);
     // 如果转换失败，返回原始文本的HTML格式
