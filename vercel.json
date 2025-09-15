@@ -9,6 +9,14 @@
       }
     }
   ],
+  "functions": {
+    "app/api/**/*.js": {
+      "maxDuration": 300
+    },
+    "**/*.js": {
+      "maxDuration": 300
+    }
+  },
 
   "routes": [
     {
