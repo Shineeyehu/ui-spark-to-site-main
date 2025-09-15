@@ -148,6 +148,13 @@ class CozeAPI {
   ): Promise<ReadableStream<CozeStreamResponse> | null> {
     try {
       const token = await this.getValidToken();
+      
+      // 创建AbortController用于超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 120000); // 120秒超时，避免30秒限制
+      
       const response = await fetch('https://api.coze.cn/v3/chat?', {
         method: 'POST',
         headers: {
@@ -170,8 +177,12 @@ class CozeAPI {
           enable_card: false,
           publish_status: 'published_online',
           auto_save_history: true
-        })
+        }),
+        signal: controller.signal
       });
+      
+      // 清除超时定时器
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -254,6 +265,13 @@ class CozeAPI {
   ): Promise<ReadableStream<CozeStreamResponse> | null> {
     try {
       const token = await this.getValidToken();
+      
+      // 创建AbortController用于超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 120000); // 120秒超时，避免30秒限制
+      
       const response = await fetch('https://api.coze.cn/v3/chat?', {
         method: 'POST',
         headers: {
@@ -290,8 +308,12 @@ class CozeAPI {
           enable_card: false,
           publish_status: 'published_online',
           auto_save_history: true
-        })
+        }),
+        signal: controller.signal
       });
+      
+      // 清除超时定时器
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

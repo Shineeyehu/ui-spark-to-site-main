@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, User, Bot, Loader2, ArrowDown } from 'lucide-react';
+import HTMLRenderErrorBoundary from './HTMLRenderErrorBoundary';
 
 interface Message {
   id: string;
@@ -21,6 +22,26 @@ interface CozeV3ChatProps {
   useJWT?: boolean;
   authService?: any;
 }
+
+// HTML内容处理函数
+const processHTMLContent = (content: string): string => {
+  if (!content) return '';
+  
+  // 确保HTML内容格式正确
+  let processedContent = content;
+  
+  // 如果内容不包含HTML标签，将换行符转换为<br>
+  if (!/<[^>]+>/.test(processedContent)) {
+    processedContent = processedContent.replace(/\n/g, '<br>');
+  }
+  
+  // 确保基本的HTML结构
+  if (processedContent && !processedContent.includes('<')) {
+    processedContent = `<p>${processedContent}</p>`;
+  }
+  
+  return processedContent;
+};
 
 const CozeV3Chat: React.FC<CozeV3ChatProps> = ({ 
   botId, 
@@ -925,10 +946,12 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
                        </div>
                        
                        <div className="max-h-96 overflow-y-auto bg-white/70 rounded-lg p-4 border border-blue-100">
-                         <div 
-                           className="text-sm leading-relaxed prose prose-sm max-w-none"
-                           dangerouslySetInnerHTML={{ __html: message.content }}
-                         />
+                         <HTMLRenderErrorBoundary>
+                           <div 
+                             className="text-sm leading-relaxed prose prose-sm max-w-none [&>*]:mb-2 [&>h1]:text-lg [&>h1]:font-bold [&>h2]:text-base [&>h2]:font-semibold [&>h3]:text-sm [&>h3]:font-medium [&>p]:text-sm [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4 [&>li]:mb-1"
+                             dangerouslySetInnerHTML={{ __html: processHTMLContent(message.content) }}
+                           />
+                         </HTMLRenderErrorBoundary>
                        </div>
                        
                        <div className="mt-4 text-xs text-blue-700 bg-blue-100 rounded-lg p-2">

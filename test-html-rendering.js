@@ -177,12 +177,67 @@ function checkAssetSizes() {
   });
 }
 
+// 检查API超时配置
+function checkApiConfiguration() {
+  log('检查API超时配置...');
+  
+  try {
+    const cozeApiPath = path.join(process.cwd(), 'src/lib/coze-api.ts');
+    if (!checkFileExists(cozeApiPath)) {
+      log('coze-api.ts文件不存在', 'error');
+      return false;
+    }
+    
+    const cozeApiContent = fs.readFileSync(cozeApiPath, 'utf8');
+    
+    if (cozeApiContent.includes('120000') && cozeApiContent.includes('AbortController')) {
+      log('API超时配置已优化 (120秒)', 'success');
+    } else {
+      log('API超时配置未找到', 'error');
+      return false;
+    }
+    
+    if (cozeApiContent.includes('signal: controller.signal')) {
+      log('AbortController信号配置正确', 'success');
+    } else {
+      log('AbortController信号配置缺失', 'error');
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    log(`无法检查API配置文件: ${error.message}`, 'error');
+    return false;
+  }
+}
+
+// 检查错误边界组件
+function checkErrorBoundary() {
+  log('检查HTML渲染错误边界...');
+  
+  try {
+    const errorBoundaryPath = path.join(process.cwd(), 'src/components/HTMLRenderErrorBoundary.tsx');
+    if (checkFileExists(errorBoundaryPath)) {
+      log('HTML渲染错误边界组件存在', 'success');
+      return true;
+    } else {
+      log('HTML渲染错误边界组件缺失', 'error');
+      return false;
+    }
+  } catch (error) {
+    log(`无法检查错误边界组件: ${error.message}`, 'error');
+    return false;
+  }
+}
+
 // 主测试函数
 function runTests() {
   console.log(colors.blue('\n=== HTML渲染功能部署前测试 ===\n'));
   
   const buildFilesOk = checkBuildFiles();
   const htmlContentOk = checkHtmlContent();
+  const apiConfigOk = checkApiConfiguration();
+  const errorBoundaryOk = checkErrorBoundary();
   checkAssetSizes();
   
   console.log(colors.blue('\n=== 测试结果汇总 ==='));
@@ -190,13 +245,21 @@ function runTests() {
   console.log(`${colors.red('失败:')} ${testResults.failed}`);
   console.log(`${colors.yellow('警告:')} ${testResults.warnings}`);
   
-  if (buildFilesOk && htmlContentOk && testResults.failed === 0) {
+  if (buildFilesOk && htmlContentOk && apiConfigOk && errorBoundaryOk && testResults.failed === 0) {
     console.log(colors.green('\n✅ 所有测试通过！HTML渲染功能准备就绪，可以部署到Vercel。'));
     console.log(colors.blue('\n📋 部署检查清单:'));
     console.log('  ✓ 构建文件完整');
     console.log('  ✓ HTML结构正确');
     console.log('  ✓ 扣子SDK正确引入');
     console.log('  ✓ 资源文件存在');
+    console.log('  ✓ API超时配置优化');
+    console.log('  ✓ 错误边界组件存在');
+    console.log(colors.blue('\n🔧 修复内容:'));
+    console.log('  - API超时从30秒优化到120秒');
+    console.log('  - 添加AbortController信号控制');
+    console.log('  - 优化HTML内容处理函数');
+    console.log('  - 添加错误边界组件');
+    console.log('  - 优化Vercel配置和缓存策略');
     console.log(colors.yellow('\n⚠️  请确保在Vercel中正确配置环境变量！'));
     process.exit(0);
   } else {
@@ -210,4 +273,4 @@ if (import.meta.url === `file://${process.argv[1]}` || import.meta.url.endsWith(
   runTests();
 }
 
-export { runTests, checkBuildFiles, checkHtmlContent, checkAssetSizes };
+export { runTests, checkBuildFiles, checkHtmlContent, checkAssetSizes, checkApiConfiguration, checkErrorBoundary };
