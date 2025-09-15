@@ -119,31 +119,64 @@ class MoonshotAPI {
   }
 
   /**
+   * 重试机制
+   */
+  private async retryRequest<T>(
+    requestFn: () => Promise<T>,
+    maxRetries: number = 2,
+    delay: number = 1000
+  ): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await requestFn();
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // 如果是网络错误或超时错误，进行重试
+        if (error instanceof Error && 
+            (error.message.includes('timeout') || 
+             error.message.includes('network') ||
+             error.message.includes('fetch'))) {
+          console.warn(`请求失败，${delay}ms后进行第${attempt + 1}次重试:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, delay * (attempt + 1)));
+          continue;
+        }
+        
+        throw error;
+      }
+    }
+    throw new Error('重试次数已用完');
+  }
+
+  /**
    * 调用Moonshot API生成知识卡HTML
    */
   async generateKnowledgeCard(
-    userContent: string,
+    content: string,
     onMessage?: (content: string) => void,
     onError?: (error: Error) => void,
     onComplete?: () => void
-  ): Promise<string | null> {
-    try {
-      const systemPrompt = await this.loadSystemPrompt();
+  ): Promise<string> {
+    return this.retryRequest(async () => {
+      try {
+        const systemPrompt = await this.loadSystemPrompt();
 
       const messages: MoonshotMessage[] = [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: userContent
-        }
-      ];
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: content
+          }
+        ];
 
       // 创建AbortController用于超时控制
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 增加到180秒超时
 
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -177,116 +210,118 @@ class MoonshotAPI {
       } else {
         throw new Error('No content generated');
       }
-    } catch (error) {
-      // console.error('Moonshot API调用失败:', error);
-      onError?.(error as Error);
-      return null;
-    }
+      } catch (error) {
+        // console.error('Moonshot API调用失败:', error);
+        onError?.(error as Error);
+        throw error;
+      }
+    }, 2, 1000);
   }
 
   /**
    * 流式调用Moonshot API
    */
   async generateKnowledgeCardStream(
-    userContent: string,
-    onMessage?: (content: string) => void,
+    content: string,
+    onChunk?: (chunk: string) => void,
     onError?: (error: Error) => void,
     onComplete?: () => void
   ): Promise<ReadableStream<string> | null> {
     try {
-      const systemPrompt = await this.loadSystemPrompt();
+      return await this.retryRequest(async () => {
+        const systemPrompt = await this.loadSystemPrompt();
 
-      const messages: MoonshotMessage[] = [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: userContent
+        const messages: MoonshotMessage[] = [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: content
+          }
+        ];
+
+        // 创建AbortController用于超时控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 流式请求增加到300秒超时
+
+        const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.apiKey}`
+          },
+          body: JSON.stringify({
+            model: this.config.model,
+            messages: messages,
+            temperature: 0.6,
+            max_tokens: 32768,
+            top_p: 1,
+            stream: true
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-      ];
 
-      // 创建AbortController用于超时控制
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 流式请求120秒超时
+        if (!response.body) {
+          throw new Error('Response body is null');
+        }
 
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: messages,
-          temperature: 0.6,
-          max_tokens: 32768,
-          top_p: 1,
-          stream: true
-        }),
-        signal: controller.signal
-      });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-      clearTimeout(timeoutId);
+        const stream = new ReadableStream<string>({
+          start(controller) {
+            function pump(): Promise<void> {
+              return reader.read().then(({ done, value }) => {
+                if (done) {
+                  controller.close();
+                  onComplete?.();
+                  return;
+                }
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
 
-      if (!response.body) {
-        throw new Error('Response body is null');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      const stream = new ReadableStream<string>({
-        start(controller) {
-          function pump(): Promise<void> {
-            return reader.read().then(({ done, value }) => {
-              if (done) {
-                controller.close();
-                onComplete?.();
-                return;
-              }
-
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n');
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  try {
-                    const data = line.slice(6);
-                    if (data === '[DONE]') {
-                      controller.close();
-                      onComplete?.();
-                      return;
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    try {
+                      const data = line.slice(6);
+                      if (data === '[DONE]') {
+                        controller.close();
+                        onComplete?.();
+                        return;
+                      }
+                      
+                      const parsed = JSON.parse(data);
+                      if (parsed.choices && parsed.choices[0]?.delta?.content) {
+                        const content = parsed.choices[0].delta.content;
+                        controller.enqueue(content);
+                        onChunk?.(content);
+                      }
+                    } catch (e) {
+                      // console.warn('Failed to parse SSE data:', line);
                     }
-                    
-                    const parsed = JSON.parse(data);
-                    if (parsed.choices && parsed.choices[0]?.delta?.content) {
-                      const content = parsed.choices[0].delta.content;
-                      controller.enqueue(content);
-                      onMessage?.(content);
-                    }
-                  } catch (e) {
-                    // console.warn('Failed to parse SSE data:', line);
                   }
                 }
-              }
 
-              return pump();
-            });
+                return pump();
+              });
+            }
+
+            return pump();
           }
+        });
 
-          return pump();
-        }
-      });
-
-      return stream;
+        return stream;
+      }, 2, 1000);
     } catch (error) {
-      // console.error('Moonshot流式API调用失败:', error);
       onError?.(error as Error);
       return null;
     }
