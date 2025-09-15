@@ -141,6 +141,10 @@ class MoonshotAPI {
         }
       ];
 
+      // 创建AbortController用于超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -154,8 +158,11 @@ class MoonshotAPI {
           max_tokens: 32768,
           top_p: 1,
           stream: false
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -200,6 +207,10 @@ class MoonshotAPI {
         }
       ];
 
+      // 创建AbortController用于超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 流式请求120秒超时
+
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -213,8 +224,11 @@ class MoonshotAPI {
           max_tokens: 32768,
           top_p: 1,
           stream: true
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
