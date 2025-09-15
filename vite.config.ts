@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: process.env.NODE_ENV === 'production' ? '/ui-spark-to-site-main/' : '/',
   server: {
     host: "::",
     port: 8080,
