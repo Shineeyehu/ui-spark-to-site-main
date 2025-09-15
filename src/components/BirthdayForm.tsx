@@ -139,17 +139,17 @@ const BirthdayForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!validateForm()) {
       return;
     }
 
-    // 跳转到报告页面，传递表单数据
-    navigate('/report', { 
-      state: { 
-        formData: formData,
-        fromBirthday: true // 标记来自生日页面
-      } 
+    // 直接跳转到报告页面，让ReportPage负责启动分析
+    navigate('/report', {
+      state: {
+        formData,
+        fromBirthday: true
+      }
     });
   };
 

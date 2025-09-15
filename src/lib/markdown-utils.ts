@@ -39,20 +39,29 @@ export function isMarkdownFormat(text: string): boolean {
     return false;
   }
 
-  // 检测常见的markdown标记
+  // 检测常见的markdown标记，支持中文内容
   const markdownPatterns = [
-    /^#{1,6}\s/, // 标题
-    /\*\*.*\*\*/, // 粗体
-    /\*.*\*/, // 斜体
-    /^\s*[-*+]\s/, // 无序列表
-    /^\s*\d+\.\s/, // 有序列表
-    /^\s*>\s/, // 引用
-    /```/, // 代码块
-    /`.*`/, // 行内代码
-    /\[.*\]\(.*\)/, // 链接
+    /^#{1,6}\s+.+/m, // 标题（支持中文）
+    /\*\*[^*]+\*\*/, // 粗体
+    /\*[^*]+\*/, // 斜体（但不是列表）
+    /^\s*[-*+]\s+.+/m, // 无序列表
+    /^\s*\d+\.\s+.+/m, // 有序列表
+    /^\s*>\s+.+/m, // 引用
+    /```[\s\S]*?```/, // 代码块
+    /`[^`]+`/, // 行内代码
+    /\[[^\]]+\]\([^)]+\)/, // 链接
+    /^---+$/m, // 分隔线
+    /^\s*\*\s+\*\*[^*]+\*\*/, // 列表项中的粗体（如：* **性别**：男）
   ];
 
-  return markdownPatterns.some((pattern) => pattern.test(text));
+  // 检查是否包含多个markdown特征
+  const matchCount = markdownPatterns.filter(pattern => pattern.test(text)).length;
+  
+  // 如果包含多个markdown特征，或者包含明显的markdown结构，则认为是markdown
+  return matchCount >= 2 || 
+         /^#{1,6}\s+.+/m.test(text) || // 包含标题
+         /^\s*[-*+]\s+.+/m.test(text) || // 包含列表
+         /```[\s\S]*?```/.test(text); // 包含代码块
 }
 
 /**
@@ -70,13 +79,65 @@ export function smartContentProcess(content: string): string {
     return content;
   }
 
-  // 如果检测到markdown格式，进行转换
-  if (isMarkdownFormat(content)) {
-    return markdownToHtml(content);
+  // 预处理内容，处理JSON格式的扣子返回数据
+  let cleanContent = content;
+  
+  // 尝试解析JSON格式的扣子返回数据
+  try {
+    // 检查是否为JSON格式
+    if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+      const jsonData = JSON.parse(content);
+      
+      // 处理扣子返回的JSON数据
+      if (jsonData.msg_type && jsonData.data) {
+        cleanContent = jsonData.data;
+      } else if (jsonData.wrapped_text) {
+        cleanContent = jsonData.wrapped_text;
+      } else if (jsonData.content) {
+        cleanContent = jsonData.content;
+      } else {
+        // 如果是其他JSON格式，尝试提取文本内容
+        cleanContent = JSON.stringify(jsonData, null, 2);
+      }
+    }
+  } catch (error) {
+    // 如果不是有效JSON，继续使用原始内容
+    console.log('非JSON格式内容，使用原始处理逻辑');
+  }
+  
+  // 移除可能的JSON数据片段和特殊字符
+  cleanContent = cleanContent.replace(/@arguments.*?}}/g, '');
+  cleanContent = cleanContent.replace(/\{"status":"success".*?\}/g, '');
+  cleanContent = cleanContent.replace(/\{"msg_type":"generate_answer_finish".*?\}/g, '');
+  cleanContent = cleanContent.replace(/\\n/g, '\n'); // 处理转义的换行符
+  cleanContent = cleanContent.replace(/\\"/g, '"'); // 处理转义的引号
+  
+  // 清理重复的内容
+  const lines = cleanContent.split('\n');
+  const uniqueLines = [];
+  const seenLines = new Set();
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (trimmedLine && !seenLines.has(trimmedLine)) {
+      seenLines.add(trimmedLine);
+      uniqueLines.push(line);
+    } else if (!trimmedLine) {
+      // 保留空行
+      uniqueLines.push(line);
+    }
+  }
+  
+  cleanContent = uniqueLines.join('\n');
+
+  // 如果检测到markdown格式，进行转换并添加样式
+  if (isMarkdownFormat(cleanContent)) {
+    const html = markdownToHtml(cleanContent);
+    return addMarkdownStyles(html);
   }
 
   // 否则作为纯文本处理，保留换行
-  return `<div class="whitespace-pre-wrap">${content}</div>`;
+  return `<div class="whitespace-pre-wrap">${cleanContent}</div>`;
 }
 
 /**
@@ -91,29 +152,29 @@ export function addMarkdownStyles(html: string): string {
 
   return (
     html
-      // 为标题添加样式
+      // 为标题添加样式，特别优化中文标题
       .replace(
         /<h1>/g,
-        '<h1 class="text-2xl font-bold text-amber-900 mb-4 mt-6 first:mt-0">',
+        '<h1 class="text-2xl font-bold text-amber-900 mb-4 mt-6 first:mt-0 tracking-wide">',
       )
       .replace(
         /<h2>/g,
-        '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-1">',
+        '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide">',
       )
       .replace(
         /<h3>/g,
-        '<h3 class="text-lg font-semibold text-amber-800 mb-2 mt-4 first:mt-0">',
+        '<h3 class="text-lg font-semibold text-amber-800 mb-2 mt-4 first:mt-0 tracking-wide">',
       )
       .replace(
         /<h4>/g,
-        '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0">',
+        '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">',
       )
-      // 为段落添加样式
-      .replace(/<p>/g, '<p class="mb-3 text-gray-700 leading-relaxed">')
-      // 为列表添加样式
-      .replace(/<ul>/g, '<ul class="mb-3 ml-4 space-y-1">')
-      .replace(/<ol>/g, '<ol class="mb-3 ml-4 space-y-1">')
-      .replace(/<li>/g, '<li class="text-gray-700">')
+      // 为段落添加样式，优化中文阅读体验
+      .replace(/<p>/g, '<p class="mb-3 text-gray-700 leading-relaxed text-sm">')
+      // 为列表添加样式，优化中文列表显示
+      .replace(/<ul>/g, '<ul class="mb-4 ml-6 space-y-2 list-disc">')
+      .replace(/<ol>/g, '<ol class="mb-4 ml-6 space-y-2 list-decimal">')
+      .replace(/<li>/g, '<li class="text-gray-700 text-sm leading-relaxed pl-1">')
       // 为强调文本添加样式
       .replace(/<strong>/g, '<strong class="font-semibold text-amber-800">')
       .replace(/<em>/g, '<em class="italic text-amber-700">')
@@ -130,6 +191,11 @@ export function addMarkdownStyles(html: string): string {
       .replace(
         /<blockquote>/g,
         '<blockquote class="border-l-4 border-amber-300 pl-4 italic text-amber-700 mb-3">',
+      )
+      // 为分隔线添加样式
+      .replace(
+        /<hr>/g,
+        '<hr class="my-6 border-t border-amber-300">',
       )
   );
 }

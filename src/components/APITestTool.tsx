@@ -68,8 +68,8 @@ const APITestTool: React.FC = () => {
         return;
       }
       
-      if (config.token && !config.token.startsWith('cztei_')) {
-        addTestResult('Coze 配置', 'warning', 'Token 格式可能不正确，应以 cztei_ 开头');
+      if (config.token && !config.token.startsWith('pat_')) {
+        addTestResult('Coze 配置', 'warning', 'Token 格式可能不正确，应以 pat_ 开头');
         return;
       }
       

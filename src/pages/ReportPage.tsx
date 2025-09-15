@@ -6,7 +6,9 @@ import { FileText, Download, Star, TrendingUp, CheckCircle, ArrowLeft, Sparkles,
 import { Link, useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useMoonshot } from '@/hooks/use-moonshot';
+import { useCozeStream } from '@/hooks/use-coze-stream';
 import { smartContentProcess, addMarkdownStyles } from '@/lib/markdown-utils';
+import type { BirthInfo } from '@/lib/coze-api';
 
 const ReportPage = () => {
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -31,8 +33,16 @@ const ReportPage = () => {
     baseUrl: 'https://api.moonshot.cn/v1'
   });
 
+  // 使用扣子API Hook
+  const {
+    streamState,
+    startBirthAnalysis,
+    stopStream,
+    clearMessages
+  } = useCozeStream();
+
   // 从路由状态获取传递的数据
-  const { generatedImageUrl, formData, analysisContent, fromBirthday } = location.state || {};
+  const { generatedImageUrl, formData, analysisContent, fromBirthday, startAnalysis } = location.state || {};
   
   // 5秒后自动关闭分析提示
   useEffect(() => {
@@ -123,20 +133,43 @@ const ReportPage = () => {
 
 ---`;
 
-  // 生成分析内容
-  const generateAnalysisContent = () => {
+  // 生成分析内容 - 现在调用扣子智能体
+  const generateAnalysisContent = async () => {
     if (!formData) return '';
     
-    return `您好！我是玄机子，很荣幸能为您分析孩子的命理格局。根据您提供的信息，我需要先确认几个关键点：
+    // 将formData转换为BirthInfo格式
+    const birthInfo: BirthInfo = {
+      gender: formData.gender,
+      calendar: formData.calendar,
+      birthDate: formData.birthDate,
+      birthTime: formData.birthTime,
+      isLeapMonth: formData.isLeapMonth,
+      birthPlace: formData.birthPlace,
+      birthEnvironment: formData.birthEnvironment,
+      age: formData.age,
+      palmReading: formData.palmReading
+    };
 
-1. **孩子的性别**：您提到"${formData.gender === 'male' ? '男' : '女'}"，确认是${formData.gender === 'male' ? '男孩' : '女孩'}
-2. **出生时间**：${formData.calendar === 'solar' ? '公历' : '农历'}${formData.birthDate} ${formData.birthTime}
-3. **出生地点**：${formData.birthPlace}
-4. **手相信息**：${formData.palmReading ? '您上传了手相照片，我会进行专业分析' : '暂无手相信息'}
-5. **居住环境**：${formData.birthEnvironment}
-6. **年龄**：${formData.age}岁
+    try {
+      // 调用扣子智能体进行分析
+      await startBirthAnalysis(birthInfo);
+      
+      // 返回初始提示信息
+      return `正在调用扣子智能体进行专业命理分析...
 
-现在让我为您进行全面的命理分析：`;
+根据您提供的信息：
+- 性别：${formData.gender === 'male' ? '男孩' : '女孩'}
+- 出生时间：${formData.calendar === 'solar' ? '公历' : '农历'}${formData.birthDate} ${formData.birthTime}
+- 出生地点：${formData.birthPlace}
+- 居住环境：${formData.birthEnvironment}
+- 年龄：${formData.age}岁
+${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
+
+智能体正在基于知识库进行深度分析，请稍候...`;
+    } catch (error) {
+      console.error('调用扣子智能体失败:', error);
+      return `调用扣子智能体时出现错误：${error instanceof Error ? error.message : '未知错误'}`;
+    }
   };
 
   // 如果有传递的图片URL，自动显示
@@ -149,26 +182,123 @@ const ReportPage = () => {
   // 如果来自生日页面，自动开始AI分析
   useEffect(() => {
     if (fromBirthday && formData) {
+      // 无论是否在BirthdayForm中启动过，都在ReportPage中重新启动
+      // 这样可以确保流式响应被正确监听
       handleStartAIAnalysis();
     }
   }, [fromBirthday, formData]);
 
-  // 开始AI分析
+  // 监听流式分析完成，自动调用 Moonshot API 生成 HTML 知识卡
+  useEffect(() => {
+    console.log('监听流式完成状态:', {
+      isStreaming: streamState.isStreaming,
+      messagesLength: streamState.messages.length,
+      hasGeneratedHTML: !!moonshotState.generatedHTML,
+      latestMessage: streamState.messages.length > 0 ? streamState.messages[streamState.messages.length - 1]?.substring(0, 100) + '...' : 'none'
+    });
+    
+    if (!streamState.isStreaming && streamState.messages.length > 0 && !moonshotState.generatedHTML) {
+      const latestMessage = streamState.messages[streamState.messages.length - 1];
+      if (latestMessage && latestMessage.trim()) {
+        console.log('扣子分析完成，开始调用 Moonshot API 生成 HTML 知识卡...');
+        console.log('分析内容长度:', latestMessage.length);
+        generateKnowledgeCard(latestMessage).catch(error => {
+          console.error('自动生成 HTML 知识卡失败:', error);
+        });
+      } else {
+        console.log('最新消息为空，跳过 Moonshot API 调用');
+      }
+    } else {
+      console.log('不满足调用 Moonshot API 的条件');
+    }
+  }, [streamState.isStreaming, streamState.messages, moonshotState.generatedHTML]);
+
+  // 超时检测：如果分析超过3分钟，自动显示超时错误
+  useEffect(() => {
+    if (streamState.isStreaming) {
+      const timeoutTimer = setTimeout(() => {
+        setAiAnalysisResult('分析超时：扣子智能体响应时间过长，请稍后重试。可能的原因：网络连接问题、API服务繁忙或token配置错误。');
+        // 停止流式处理
+        stopStream();
+        setIsAnalyzing(false);
+      }, 180000); // 3分钟超时
+      
+      return () => clearTimeout(timeoutTimer);
+    }
+  }, [streamState.isStreaming, stopStream]);
+
+  // 监听扣子流式响应
+  useEffect(() => {
+    if (streamState.currentMessage) {
+      // 实时更新当前流式消息
+      setAiAnalysisResult(prev => {
+        // 如果是初始提示信息，替换为流式内容
+        if (prev.includes('正在调用扣子智能体进行专业命理分析')) {
+          return streamState.currentMessage;
+        }
+        return streamState.currentMessage;
+      });
+    }
+    
+    // 当有完整消息时，更新结果
+    if (streamState.messages.length > 0) {
+      const latestMessage = streamState.messages[streamState.messages.length - 1];
+      setAiAnalysisResult(latestMessage);
+    }
+
+    // 处理错误
+    if (streamState.error) {
+      setAiAnalysisResult(`扣子智能体分析出错：${streamState.error}`);
+      setIsAnalyzing(false);
+    }
+
+    // 流式传输完成
+    if (!streamState.isStreaming && streamState.messages.length > 0) {
+      setIsAnalyzing(false);
+    }
+  }, [streamState]);
+
+  // 开始AI分析 - 使用扣子智能体
   const handleStartAIAnalysis = async () => {
     setIsAnalyzing(true);
     setShowAIImage(true);
     
-    // 生成分析内容并调用Moonshot API
-    const analysisContent = generateAnalysisContent();
-    await generateKnowledgeCardStream(analysisContent);
+    try {
+      // 调用扣子智能体进行分析
+      const initialContent = await generateAnalysisContent();
+      setAiAnalysisResult(initialContent);
+    } catch (error) {
+      console.error('AI分析失败:', error);
+      setAiAnalysisResult(`分析失败：${error instanceof Error ? error.message : '未知错误'}`);
+    }
     
     setIsAnalyzing(false);
   };
 
-  // 重新生成知识卡
+  // 重新生成知识卡 - 使用现有的扣子分析结果
   const handleRegenerateKnowledgeCard = async () => {
-    const analysisContent = generateAnalysisContent();
-    await generateKnowledgeCardStream(analysisContent);
+    try {
+      // 获取最新的分析内容
+      let contentToUse = '';
+      if (streamState.messages.length > 0) {
+        contentToUse = streamState.messages[streamState.messages.length - 1];
+      } else if (aiAnalysisResult) {
+        contentToUse = aiAnalysisResult;
+      }
+      
+      if (contentToUse && contentToUse.trim()) {
+        console.log('使用现有分析结果重新生成 HTML 知识卡...');
+        await generateKnowledgeCard(contentToUse);
+      } else {
+        // 如果没有现有内容，则重新启动分析
+        console.log('没有现有分析结果，重新启动分析...');
+        clearMessages();
+        setAiAnalysisResult('');
+        await handleStartAIAnalysis();
+      }
+    } catch (error) {
+      console.error('重新生成知识卡失败:', error);
+    }
   };
 
   // 测试功能 - 生产环境已注释
@@ -219,21 +349,31 @@ const ReportPage = () => {
     }
   };
 
-  // 生成 AI 知识卡
+  // 生成 AI 知识卡 - 使用扣子智能体 + Moonshot API
   const handleGenerateKnowledgeCard = async () => {
     try {
-      clearMoonshotError();
+      setIsAnalyzing(true);
       setShowAIImage(true);
+      clearMessages(); // 清除之前的消息
       
-      // 生成分析内容
-      const analysisContent = generateAnalysisContent();
-      await generateKnowledgeCardStream(analysisContent);
+      // 第一步：调用扣子智能体生成分析内容
+      const initialContent = await generateAnalysisContent();
+      setAiAnalysisResult(initialContent);
+      
+      // 第二步：将扣子分析结果传递给 Moonshot API 生成 HTML 知识卡
+      if (initialContent && initialContent.trim()) {
+        console.log('开始调用 Moonshot API 生成 HTML 知识卡...');
+        await generateKnowledgeCard(initialContent);
+      }
     } catch (error) {
       console.error('生成知识卡失败:', error);
+      setAiAnalysisResult(`生成知识卡失败：${error instanceof Error ? error.message : '未知错误'}`);
+      setIsAnalyzing(false);
+      
       // 提供更详细的错误信息
       if (error instanceof Error) {
-        if (error.message.includes('API Key 未配置')) {
-          console.error('API配置错误，请检查环境变量设置');
+        if (error.message.includes('Token格式不正确')) {
+          console.error('扣子API Token配置错误，请检查环境变量设置');
         } else if (error.message.includes('Failed to fetch')) {
           console.error('网络连接失败，请检查网络连接或稍后重试');
         }
@@ -276,13 +416,13 @@ const ReportPage = () => {
           </div>
 
           {/* 生成状态提示 - 在卡片上方 */}
-          {fromBirthday && showAnalyzeHint && (isAnalyzing || moonshotState.isGenerating || moonshotState.isStreaming) && (
+          {fromBirthday && showAnalyzeHint && (isAnalyzing || streamState.isStreaming) && (
             <div className="mb-6 mx-4">
-              {(isAnalyzing || moonshotState.isGenerating || moonshotState.isStreaming) ? (
+              {(isAnalyzing || streamState.isStreaming) ? (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                    <span className="text-blue-800 font-medium">贫道正在静心起盘，倾力为您剖析。</span>
+                    <span className="text-blue-800 font-medium">扣子智能体正在基于知识库为您深度分析...</span>
                   </div>
                   <p className="text-sm text-blue-600">请稍等一盏茶的工夫</p>
                 </div>
@@ -290,7 +430,7 @@ const ReportPage = () => {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Sparkles className="w-5 h-5 text-green-600" />
-                    <span className="text-green-800 font-medium">AI 分析完成</span>
+                    <span className="text-green-800 font-medium">智能体分析完成</span>
                   </div>
                   <p className="text-sm text-green-600">知识卡已生成完成</p>
                 </div>
@@ -344,12 +484,12 @@ const ReportPage = () => {
               style={{ transform: `scale(${zoomLevel})` }}
             >
               {/* 生成状态提示 */}
-              {(moonshotState.isGenerating || moonshotState.isStreaming) && (
+              {streamState.isStreaming && (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="flex items-center gap-3 mb-4">
                     <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
                     <span className="text-lg font-medium text-blue-800">
-                      {moonshotState.isGenerating ? 'AI 正在生成知识卡...' : 'AI 正在流式生成知识卡...'}
+                      扣子智能体正在基于知识库生成知识卡...
                     </span>
                   </div>
                   <p className="text-sm text-blue-600">请稍候片刻</p>
@@ -357,19 +497,27 @@ const ReportPage = () => {
               )}
 
               {/* 错误状态 */}
-              {moonshotState.error && (
+              {streamState.error && (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-lg">
                     <div className="text-center">
-                      <div className="text-red-600 font-medium mb-2">生成失败</div>
-                      <div className="text-sm text-red-500 mb-4">{moonshotState.error}</div>
+                      <div className="text-red-600 font-medium mb-2">AI分析失败</div>
+                      <div className="text-sm text-red-500 mb-4">{streamState.error}</div>
+                      <div className="text-xs text-gray-600 mb-4">
+                        <p className="mb-2">可能的解决方案：</p>
+                        <ul className="text-left space-y-1">
+                          <li>• 检查网络连接是否正常</li>
+                          <li>• 稍后重试，API服务可能暂时繁忙</li>
+                          <li>• 如果问题持续，请联系技术支持</li>
+                        </ul>
+                      </div>
                       <Button 
                         onClick={handleRegenerateKnowledgeCard}
                         variant="outline"
                         size="sm"
                         className="text-red-600 border-red-200 hover:bg-red-50"
                       >
-                        重新生成
+                        重新分析
                       </Button>
                     </div>
                   </div>
@@ -377,13 +525,13 @@ const ReportPage = () => {
               )}
 
               {/* 流式内容显示 */}
-              {moonshotState.isStreaming && moonshotState.streamContent && (
+              {streamState.isStreaming && streamState.currentMessage && (
                 <div className="mb-6">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="text-sm font-medium text-blue-800 mb-2">正在生成中...</h3>
+                    <h3 className="text-sm font-medium text-blue-800 mb-2">扣子智能体正在生成中...</h3>
                     <div className="h-32 overflow-y-auto">
                       <div className="text-xs text-blue-700 whitespace-pre-wrap font-mono">
-                        {moonshotState.streamContent}
+                        {streamState.currentMessage}
                       </div>
                     </div>
                   </div>
@@ -391,31 +539,55 @@ const ReportPage = () => {
               )}
 
               {/* 实时渲染HTML内容 - 流式过程中 */}
-              {moonshotState.isStreaming && moonshotState.streamContent && (
+              {streamState.isStreaming && streamState.currentMessage && (
                 <div className="mb-6">
                   <div 
                     className="knowledge-card-content prose prose-amber max-w-none"
                     dangerouslySetInnerHTML={{ 
-                      __html: addMarkdownStyles(smartContentProcess(moonshotState.streamContent))
+                      __html: addMarkdownStyles(smartContentProcess(streamState.currentMessage))
                     }}
                   />
                 </div>
               )}
 
-              {/* 最终渲染HTML内容 - 流式完成后 */}
-              {!moonshotState.isStreaming && moonshotState.generatedHTML && (
+              {/* 优先显示 Moonshot 生成的 HTML 知识卡 */}
+              {!streamState.isStreaming && moonshotState.generatedHTML && (
+                <div className="mb-6">
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-1">
+                    <div 
+                      className="knowledge-card-content"
+                      dangerouslySetInnerHTML={{ __html: moonshotState.generatedHTML }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 如果没有 Moonshot HTML，则显示流式完成后的内容 */}
+              {!streamState.isStreaming && !moonshotState.generatedHTML && streamState.messages.length > 0 && (
                 <div className="mb-6">
                   <div 
                     className="knowledge-card-content prose prose-amber max-w-none"
                     dangerouslySetInnerHTML={{ 
-                      __html: addMarkdownStyles(smartContentProcess(moonshotState.generatedHTML))
+                      __html: addMarkdownStyles(smartContentProcess(streamState.messages[streamState.messages.length - 1]))
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* 显示AI分析结果 - 如果没有其他内容的话 */}
+              {!streamState.isStreaming && !moonshotState.generatedHTML && streamState.messages.length === 0 && aiAnalysisResult && (
+                <div className="mb-6">
+                  <div 
+                    className="knowledge-card-content prose prose-amber max-w-none"
+                    dangerouslySetInnerHTML={{ 
+                      __html: addMarkdownStyles(smartContentProcess(aiAnalysisResult))
                     }}
                   />
                 </div>
               )}
 
               {/* 空状态 - 显示默认图片 */}
-              {!moonshotState.isGenerating && !moonshotState.isStreaming && !moonshotState.generatedHTML && !moonshotState.error && (
+              {!streamState.isStreaming && streamState.messages.length === 0 && !aiAnalysisResult && !streamState.error && (
                 <div className="flex flex-col items-center justify-center">
                   <img 
                     src="/lovable-uploads/f705bd19-34cd-4afa-894e-12b414403c8e.png" 

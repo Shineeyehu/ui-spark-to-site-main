@@ -33,7 +33,7 @@ export const getCozeConfigSecure = async (): Promise<CozeConfig> => {
       token: 'cztei_qWuvWgYwcOQJ3ueTuzbytdrHwxRumNwJOTkFAl94W16W1FZlrbGeamRdnRODnL4hb',
       userId: 'user_' + Date.now(),
       nickname: '用户',
-      useJWT: true
+      useJWT: false // 暂时禁用JWT认证，使用静态token
     };
   } catch (error) {
     console.error('配置获取错误:', error);
@@ -43,7 +43,7 @@ export const getCozeConfigSecure = async (): Promise<CozeConfig> => {
       token: 'cztei_qWuvWgYwcOQJ3ueTuzbytdrHwxRumNwJOTkFAl94W16W1FZlrbGeamRdnRODnL4hb',
       userId: 'user_' + Date.now(),
       nickname: '用户',
-      useJWT: true
+      useJWT: false // 暂时禁用JWT认证，使用静态token
     };
   }
 };
@@ -98,5 +98,5 @@ export const defaultCozeConfig: CozeConfig = {
   token: '',
   userId: 'user_123',
   nickname: '用户',
-  useJWT: true
+  useJWT: false // 暂时禁用JWT认证，使用静态token
 };
