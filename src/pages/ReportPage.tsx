@@ -6,6 +6,7 @@ import { FileText, Download, Star, TrendingUp, CheckCircle, ArrowLeft, Sparkles,
 import { Link, useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useMoonshot } from '@/hooks/use-moonshot';
+import { smartContentProcess, addMarkdownStyles } from '@/lib/markdown-utils';
 
 const ReportPage = () => {
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -385,8 +386,10 @@ const ReportPage = () => {
               {moonshotState.isStreaming && moonshotState.streamContent && (
                 <div className="mb-6">
                   <div 
-                    className="knowledge-card-content"
-                    dangerouslySetInnerHTML={{ __html: moonshotState.streamContent }}
+                    className="knowledge-card-content prose prose-amber max-w-none"
+                    dangerouslySetInnerHTML={{ 
+                      __html: addMarkdownStyles(smartContentProcess(moonshotState.streamContent))
+                    }}
                   />
                 </div>
               )}
@@ -395,8 +398,10 @@ const ReportPage = () => {
               {!moonshotState.isStreaming && moonshotState.generatedHTML && (
                 <div className="mb-6">
                   <div 
-                    className="knowledge-card-content"
-                    dangerouslySetInnerHTML={{ __html: moonshotState.generatedHTML }}
+                    className="knowledge-card-content prose prose-amber max-w-none"
+                    dangerouslySetInnerHTML={{ 
+                      __html: addMarkdownStyles(smartContentProcess(moonshotState.generatedHTML))
+                    }}
                   />
                 </div>
               )}
