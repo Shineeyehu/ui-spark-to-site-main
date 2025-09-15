@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client"; // 已备份到 supabase-backup 目录
 
 export interface CozeConfig {
   botId: string;
@@ -78,22 +78,23 @@ class CozeAPI {
    */
   async sendMessage(message: string, conversationId?: string): Promise<CozeResponse> {
     try {
-      const { data, error } = await supabase.functions.invoke('coze-chat', {
-        body: {
-          message,
-          conversationId: conversationId || this.config.conversationId
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      return data;
+      // 原 Supabase Edge Function 调用已注释，代码已备份到 supabase-backup 目录
+      // const { data, error } = await supabase.functions.invoke('coze-chat', {
+      //   body: {
+      //     message,
+      //     conversationId: conversationId || this.config.conversationId
+      //   }
+      // });
+      // if (error) {
+      //   throw new Error(error.message);
+      // }
+      // if (data?.error) {
+      //   throw new Error(data.error);
+      // }
+      // return data;
+      
+      // 临时返回模拟数据，需要实现直接调用扣子API
+      throw new Error('Supabase Edge Function已禁用，需要实现直接API调用');
     } catch (error) {
       // console.error('扣子 API 调用失败:', error);
       throw error;
@@ -105,22 +106,23 @@ class CozeAPI {
    */
   async analyzeBirthInfo(birthInfo: BirthInfo): Promise<CozeResponse> {
     try {
-      const { data, error } = await supabase.functions.invoke('coze-chat', {
-        body: {
-          birthInfo,
-          conversationId: this.config.conversationId
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      return data;
+      // 原 Supabase Edge Function 调用已注释，代码已备份到 supabase-backup 目录
+      // const { data, error } = await supabase.functions.invoke('coze-chat', {
+      //   body: {
+      //     birthInfo,
+      //     conversationId: this.config.conversationId
+      //   }
+      // });
+      // if (error) {
+      //   throw new Error(error.message);
+      // }
+      // if (data?.error) {
+      //   throw new Error(data.error);
+      // }
+      // return data;
+      
+      // 临时返回模拟数据，需要实现直接调用扣子API
+      throw new Error('Supabase Edge Function已禁用，需要实现直接API调用');
     } catch (error) {
       // console.error('扣子分析失败:', error);
       throw error;

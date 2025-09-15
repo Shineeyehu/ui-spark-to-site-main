@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client"; // 已备份到 supabase-backup 目录
 import { jwtAuthService, JWTAuthService } from "./jwt-auth";
 
 export interface CozeConfig {
@@ -10,22 +10,30 @@ export interface CozeConfig {
   authService?: JWTAuthService; // JWT 认证服务实例
 }
 
-// 安全获取配置（使用 edge function）
+// 安全获取配置（使用 edge function）- 原 Supabase 实现已注释，代码已备份到 supabase-backup 目录
 export const getCozeConfigSecure = async (): Promise<CozeConfig> => {
   try {
-    const { data, error } = await supabase.functions.invoke('get-coze-config');
+    // 原 Supabase Edge Function 调用已注释
+    // const { data, error } = await supabase.functions.invoke('get-coze-config');
+    // if (error) {
+    //   console.error('获取扣子配置失败:', error);
+    //   throw new Error('无法获取扣子配置');
+    // }
+    // return {
+    //   botId: data.botId || '7546564367413379135',
+    //   token: data.token || 'cztei_qWuvWgYwcOQJ3ueTuzbytdrHwxRumNwJOTkFAl94W16W1FZlrbGeamRdnRODnL4hb',
+    //   userId: 'user_' + Date.now(),
+    //   nickname: '用户',
+    //   useJWT: true
+    // };
     
-    if (error) {
-      console.error('获取扣子配置失败:', error);
-      throw new Error('无法获取扣子配置');
-    }
-    
+    // 直接返回默认配置，不再依赖 Supabase
     return {
-      botId: data.botId || '7546564367413379135',
-      token: data.token || 'cztei_qWuvWgYwcOQJ3ueTuzbytdrHwxRumNwJOTkFAl94W16W1FZlrbGeamRdnRODnL4hb',
+      botId: '7546564367413379135',
+      token: 'cztei_qWuvWgYwcOQJ3ueTuzbytdrHwxRumNwJOTkFAl94W16W1FZlrbGeamRdnRODnL4hb',
       userId: 'user_' + Date.now(),
       nickname: '用户',
-      useJWT: true // 默认使用 JWT
+      useJWT: true
     };
   } catch (error) {
     console.error('配置获取错误:', error);
