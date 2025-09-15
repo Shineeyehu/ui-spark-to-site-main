@@ -31,10 +31,5 @@
         "Cache-Control": "public, max-age=0, must-revalidate"
       }
     }
-  ],
-  "functions": {
-    "src/**/*.{js,ts}": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
