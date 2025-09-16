@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown转换测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .markdown-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen py-8">
+    <div class="container mx-auto px-4">
+        <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">Coze Markdown转换测试</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 原始数据 -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">原始Coze数据</h2>
+                <textarea id="rawData" class="w-full h-96 p-4 border border-gray-300 rounded-lg text-sm font-mono" placeholder="粘贴Coze返回的原始数据..."></textarea>
+                <button id="processBtn" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg">处理数据</button>
+            </div>
+            
+            <!-- 转换结果 -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">转换后的HTML</h2>
+                <div id="result" class="markdown-content border border-gray-300 rounded-lg p-4 h-96 overflow-y-auto">
+                    <p class="text-gray-500">处理后的内容将显示在这里...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 处理步骤显示 -->
+        <div class="mt-8 bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-700">处理步骤</h2>
+            <div id="steps" class="space-y-2 text-sm text-gray-600">
+                <p>等待数据输入...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟我们的处理函数
+        function enhancedContentCleaning(content) {
+            let cleaned = content;
+            
+            // 移除JSON数据块
+            cleaned = cleaned.replace(/\{[^{}]*"plugin"[^{}]*\}/g, '');
+            cleaned = cleaned.replace(/\{[^{}]*"八字"[^{}]*\}/g, '');
+            cleaned = cleaned.replace(/\{[^{}]*"紫微斗数"[^{}]*\}/g, '');
+            cleaned = cleaned.replace(/\{[^{}]*"arguments"[^{}]*\}/g, '');
+            cleaned = cleaned.replace(/\{"name":"[^"]*","arguments":\{[^}]*\}\}/g, '');
+            cleaned = cleaned.replace(/RPCError\{[^}]*\}/g, '');
+            
+            // 清理多余空行
+            cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+            
+            return cleaned.trim();
+        }
+        
+        function isMarkdownFormat(content) {
+            const cozeReportPatterns = [
+                /【[^】]+】/,
+                /\*\*[^*]+\*\*[：:]/,
+                /^#{1,6}\s+/m,
+                /命理|八字|紫微|手相|命盘/,
+                /性格特质|天赋|成长/
+            ];
+            
+            let cozeMatchCount = 0;
+            for (const pattern of cozeReportPatterns) {
+                if (pattern.test(content)) {
+                    cozeMatchCount++;
+                }
+            }
+            
+            return cozeMatchCount >= 2;
+        }
+        
+        function markdownToHtml(content) {
+            return content
+                // 中文方括号标题
+                .replace(/【([^】]+)】/g, '<div class="bg-gradient-to-r from-amber-100 to-orange-100 border-l-4 border-amber-500 p-3 mb-4 rounded-r-lg"><h3 class="text-lg font-bold text-amber-900 mb-0">【$1】</h3></div>')
+                // 标题
+                .replace(/^(#{1,6})\s+(.+)$/gm, (match, hashes, title) => {
+                    const level = hashes.length;
+                    return `<h${level} class="text-xl font-bold text-amber-900 mb-3 mt-5">${title}</h${level}>`;
+                })
+                // 粗体
+                .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-amber-800">$1</strong>')
+                // 斜体
+                .replace(/\*([^*]+)\*/g, '<em class="italic text-amber-700">$1</em>')
+                // 列表项
+                .replace(/^\* (.+)$/gm, '<li class="text-gray-700 text-sm leading-relaxed pl-1 mb-2">$1</li>')
+                // 包装列表
+                .replace(/(<li>.*<\/li>)/s, '<ul class="mb-4 ml-6 space-y-2 list-disc">$1</ul>')
+                // 段落
+                .replace(/\n\n/g, '</p><p class="mb-3 text-gray-700 leading-relaxed text-sm">')
+                .replace(/^/, '<p class="mb-3 text-gray-700 leading-relaxed text-sm">')
+                .replace(/$/, '</p>')
+                // 清理空段落
+                .replace(/<p class="[^"]*"><\/p>/g, '')
+                .replace(/<p class="[^"]*">\s*<h/g, '<h')
+                .replace(/h>\s*<\/p>/g, 'h>');
+        }
+        
+        function addMarkdownStyles(html) {
+            // 特殊处理：命理分析中的关键字段
+            return html.replace(
+                /<li[^>]*>\s*<strong>([^<]+)<\/strong>[：:]\s*([^<]+)/g,
+                '<li class="text-gray-700 text-sm leading-relaxed pl-1 mb-2"><span class="inline-block w-20 font-semibold text-amber-800">$1：</span><span class="text-gray-800">$2</span></li>'
+            );
+        }
+        
+        function smartContentProcess(content) {
+            const steps = [];
+            
+            // 1. 增强内容清理
+            steps.push('1. 清理JSON数据和API调用片段...');
+            const cleaned = enhancedContentCleaning(content);
+            
+            // 2. 检测格式
+            steps.push('2. 检测内容格式...');
+            const isMarkdown = isMarkdownFormat(cleaned);
+            steps.push(`   检测结果: ${isMarkdown ? 'Markdown格式' : '普通文本'}`);
+            
+            if (isMarkdown) {
+                // 3. 转换为HTML
+                steps.push('3. 转换Markdown为HTML...');
+                let html = markdownToHtml(cleaned);
+                
+                // 4. 添加样式
+                steps.push('4. 添加样式类...');
+                html = addMarkdownStyles(html);
+                
+                return { html, steps };
+            } else {
+                steps.push('3. 保持原始格式...');
+                return { html: `<p class="mb-3 text-gray-700 leading-relaxed text-sm">${cleaned}</p>`, steps };
+            }
+        }
+        
+        document.getElementById('processBtn').addEventListener('click', function() {
+            const rawData = document.getElementById('rawData').value;
+            if (!rawData.trim()) {
+                alert('请输入原始数据');
+                return;
+            }
+            
+            const result = smartContentProcess(rawData);
+            document.getElementById('result').innerHTML = result.html;
+            document.getElementById('steps').innerHTML = result.steps.map(step => `<p>${step}</p>`).join('');
+        });
+        
+        // 预填充示例数据
+        document.addEventListener('DOMContentLoaded', function() {
+            const sampleData = `## 【命主信息概览】
+
+* **性别**：男
+* **出生时间**：公历 2005年09月16日 18时05分
+* **四柱八字**：乙酉 乙酉 癸卯 辛酉
+* **紫微主星**：命宫无主星 | 身宫天同（陷）+太阴（不）忌
+* **手型**：土型手（推断）
+
+---
+
+## 一、 核心命理分析报告
+
+#### 1. 性格特质与教养指南 (天性之根)
+
+* **核心天性洞察**：这孩子天性如金玉之质，外表沉静内敛，内心却暗藏锋芒。他既有金的刚毅决断，又有水的灵动智慧，如同深潭中的美玉，需要细心雕琢才能绽放光彩。
+
+* **教养引导建议**：对于这样内秀的孩子，需要给予足够的信任和空间，不要过度干涉他的思考过程。`;
+            
+            document.getElementById('rawData').value = sampleData;
+        });
+    </script>
+</body>
+</html>
