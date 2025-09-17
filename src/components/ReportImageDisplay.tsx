@@ -1,178 +1,224 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Image as ImageIcon, 
-  Download, 
-  RefreshCw, 
-  ZoomIn, 
-  ZoomOut,
-  Loader2,
-  AlertCircle
-} from 'lucide-react';
+import React, { useEffect } from 'react';
+import { useCozeWorkflow } from '@/hooks/use-coze-workflow';
+import { BirthInfo } from '@/lib/coze-api';
 
 interface ReportImageDisplayProps {
-  imageUrl: string | null;
-  isLoading: boolean;
-  error: string | null;
-  onRegenerate?: () => void;
-  onDownload?: () => void;
-  title?: string;
-  description?: string;
+  birthInfo: BirthInfo;
+  onBack?: () => void;
 }
 
-const ReportImageDisplay: React.FC<ReportImageDisplayProps> = ({
-  imageUrl,
-  isLoading,
-  error,
-  onRegenerate,
-  onDownload,
-  title = "命理分析报告图",
-  description = "基于传统命理学生成的个性化分析报告"
-}) => {
-  const [zoomLevel, setZoomLevel] = React.useState(1);
+export default function ReportImageDisplay({ birthInfo, onBack }: ReportImageDisplayProps) {
+  const {
+    workflowState,
+    generateReportImage,
+    resetWorkflow,
+    retryGeneration
+  } = useCozeWorkflow();
 
-  const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 0.2, 2));
-  };
-
-  const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 0.2, 1.0));
-  };
-
-  const handleDownload = () => {
-    if (imageUrl && onDownload) {
-      onDownload();
-    } else if (imageUrl) {
-      // 默认下载行为
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = '命理分析报告.png';
-      link.target = '_blank';
-      link.click();
+  // 组件挂载时自动开始生成
+  useEffect(() => {
+    if (birthInfo) {
+      console.log('开始生成报告，生日信息:', birthInfo);
+      generateReportImage(birthInfo);
     }
+  }, [birthInfo, generateReportImage]);
+
+  // 处理重试
+  const handleRetry = () => {
+    console.log('用户点击重试');
+    retryGeneration();
   };
 
-  return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ImageIcon className="w-5 h-5" />
-          {title}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </CardHeader>
-      
-      <CardContent>
-        <div className="space-y-4">
-          {/* 控制按钮 */}
-          <div className="flex justify-between items-center">
-            <div className="flex gap-2">
-              {onRegenerate && (
-                <Button
-                  onClick={onRegenerate}
-                  variant="outline"
-                  size="sm"
-                  disabled={isLoading}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  重新生成
-                </Button>
-              )}
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                onClick={handleZoomOut}
-                variant="outline"
-                size="sm"
-                disabled={!imageUrl || zoomLevel <= 1}
-              >
-                <ZoomOut className="w-4 h-4" />
-              </Button>
-              <Button
-                onClick={handleZoomIn}
-                variant="outline"
-                size="sm"
-                disabled={!imageUrl || zoomLevel >= 2}
-              >
-                <ZoomIn className="w-4 h-4" />
-              </Button>
-              <Button
-                onClick={handleDownload}
-                variant="outline"
-                size="sm"
-                disabled={!imageUrl}
-                className="flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                下载
-              </Button>
-            </div>
-          </div>
+  // 处理返回
+  const handleBack = () => {
+    console.log('用户点击返回');
+    resetWorkflow();
+    onBack?.();
+  };
 
-          {/* 图片显示区域 */}
-          <div className="relative bg-gray-50 rounded-lg min-h-[400px] flex items-center justify-center overflow-hidden">
-            {isLoading && (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                <p className="text-sm text-gray-600">正在生成报告图片...</p>
-              </div>
-            )}
-            
-            {error && (
-              <div className="flex flex-col items-center gap-3 text-red-500">
-                <AlertCircle className="w-8 h-8" />
-                <p className="text-sm text-center max-w-md">{error}</p>
-                {onRegenerate && (
-                  <Button
-                    onClick={onRegenerate}
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                  >
-                    重试
-                  </Button>
-                )}
-              </div>
-            )}
-            
-            {imageUrl && !isLoading && !error && (
-              <div className="w-full h-full flex items-center justify-center">
-                <img
-                  src={imageUrl}
-                  alt={title}
-                  className="max-w-full max-h-full object-contain transition-transform duration-200"
-                  style={{ transform: `scale(${zoomLevel})` }}
-                  onError={() => console.error('图片加载失败')}
-                />
-              </div>
-            )}
-            
-            {!imageUrl && !isLoading && !error && (
-              <div className="flex flex-col items-center gap-3 text-gray-400">
-                <ImageIcon className="w-12 h-12" />
-                <p className="text-sm">暂无报告图片</p>
-              </div>
-            )}
+  // 渲染加载状态
+  if (workflowState.isGenerating) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="mb-6">
+            <div className="w-16 h-16 mx-auto mb-4 relative">
+              <div className="absolute inset-0 rounded-full border-4 border-purple-200"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-purple-600 border-t-transparent animate-spin"></div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">正在生成命理分析</h2>
+            <p className="text-gray-600">{workflowState.currentStep}</p>
           </div>
           
-          {/* 状态信息 */}
-          <div className="flex justify-between items-center text-xs text-gray-500">
-            <div className="flex gap-2">
-              <Badge variant="secondary">AI生成</Badge>
-              {imageUrl && <Badge variant="outline">可下载</Badge>}
+          {/* 进度条 */}
+          <div className="mb-6">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-purple-600 to-pink-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${workflowState.progress}%` }}
+              ></div>
             </div>
-            {zoomLevel !== 1 && (
-              <span>缩放: {Math.round(zoomLevel * 100)}%</span>
-            )}
+            <p className="text-sm text-gray-500 mt-2">{workflowState.progress}%</p>
+          </div>
+
+          {/* 原始流数据预览（调试用） */}
+          {workflowState.rawStreamData && (
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg text-left max-h-32 overflow-y-auto">
+              <p className="text-xs text-gray-500 mb-1">实时数据流:</p>
+              <p className="text-xs text-gray-700 font-mono">
+                {workflowState.rawStreamData.substring(0, 200)}
+                {workflowState.rawStreamData.length > 200 && '...'}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 渲染错误状态
+  if (workflowState.error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="mb-6">
+            <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">生成失败</h2>
+            <p className="text-gray-600 mb-4">{workflowState.error}</p>
+          </div>
+          
+          <div className="space-y-3">
+            <button
+              onClick={handleRetry}
+              className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            >
+              重试生成
+            </button>
+            <button
+              onClick={handleBack}
+              className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+            >
+              返回重新填写
+            </button>
+          </div>
+
+          {/* 调试信息 */}
+          {workflowState.rawStreamData && (
+            <details className="mt-4 text-left">
+              <summary className="text-sm text-gray-500 cursor-pointer">查看调试信息</summary>
+              <div className="mt-2 p-3 bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
+                <p className="text-xs text-gray-700 font-mono whitespace-pre-wrap">
+                  {workflowState.rawStreamData}
+                </p>
+              </div>
+            </details>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 渲染成功状态
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* 头部 */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-gray-800">命理分析报告</h1>
+            <button
+              onClick={handleBack}
+              className="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              返回
+            </button>
           </div>
         </div>
-      </CardContent>
-    </Card>
-  );
-};
 
-export default ReportImageDisplay;
+        {/* 报告内容 */}
+        <div className="bg-white rounded-2xl shadow-xl p-6">
+          {workflowState.reportImageUrl ? (
+            <div className="text-center">
+              <img 
+                src={workflowState.reportImageUrl} 
+                alt="命理分析报告" 
+                className="max-w-full h-auto mx-auto rounded-lg shadow-lg"
+              />
+            </div>
+          ) : workflowState.analysisData ? (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">分析结果</h2>
+              
+              {/* 渲染分析数据 */}
+              {workflowState.analysisData.sections ? (
+                <div className="space-y-4">
+                  {Object.entries(workflowState.analysisData.sections).map(([title, content]) => (
+                    <div key={title} className="border-l-4 border-purple-500 pl-4">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">{title}</h3>
+                      <p className="text-gray-600 whitespace-pre-wrap">{content}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="prose max-w-none">
+                  <div 
+                    className="text-gray-700 whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ 
+                      __html: workflowState.analysisData.content || workflowState.rawStreamData 
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">分析完成</h3>
+              <p className="text-gray-600 mb-4">但未能生成完整的报告内容</p>
+              
+              {workflowState.rawStreamData && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg text-left max-h-60 overflow-y-auto">
+                  <p className="text-sm text-gray-500 mb-2">原始分析数据:</p>
+                  <div className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                    {workflowState.rawStreamData}
+                  </div>
+                </div>
+              )}
+              
+              <button
+                onClick={handleRetry}
+                className="mt-4 bg-purple-600 text-white py-2 px-6 rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                重新生成
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 操作按钮 */}
+        <div className="mt-6 flex justify-center space-x-4">
+          <button
+            onClick={handleRetry}
+            className="bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+          >
+            重新生成
+          </button>
+          <button
+            onClick={handleBack}
+            className="bg-gray-200 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+          >
+            返回修改
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -8,6 +8,8 @@ import html2canvas from 'html2canvas';
 import { useMoonshot } from '@/hooks/use-moonshot';
 import { useCozeStream } from '@/hooks/use-coze-stream';
 import { smartContentProcess, addMarkdownStyles } from '@/lib/markdown-utils';
+import { CozeMixedDataExtractor, type ExtractedCozeData } from '@/lib/coze-mixed-data-extractor';
+import { KnowledgeCardMapper } from '@/lib/knowledge-card-mapper';
 import type { BirthInfo } from '@/lib/coze-api';
 
 const ReportPage = () => {
@@ -18,7 +20,17 @@ const ReportPage = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAnalyzeHint, setShowAnalyzeHint] = useState(true);
   const [showInitialLoading, setShowInitialLoading] = useState(true);
+  
+  // 数据处理相关状态
+  const [extractedData, setExtractedData] = useState<ExtractedCozeData | null>(null);
+  const [processedContent, setProcessedContent] = useState<string>('');
+  const [isProcessingData, setIsProcessingData] = useState(false);
+  
   const location = useLocation();
+  
+  // 初始化数据处理器
+  const mixedDataExtractor = new CozeMixedDataExtractor();
+  const knowledgeCardMapper = new KnowledgeCardMapper();
   
   // 使用Moonshot API Hook
   const {
@@ -35,7 +47,11 @@ const ReportPage = () => {
 
   // 使用扣子API Hook
   const {
-    streamState,
+    isStreaming,
+    messages,
+    currentMessage,
+    processedHTML,
+    error: streamError,
     startBirthAnalysis,
     stopStream,
     clearMessages
@@ -62,6 +78,155 @@ const ReportPage = () => {
     return () => clearTimeout(timer);
   }, []);
   
+  /**
+   * 四步数据处理流程
+   * 1. 数据接收 → 从Coze API获取混合格式响应
+   * 2. 内容分离 → 智能识别并分离JSON和Markdown部分
+   * 3. Markdown处理 → 深度解析和清理Markdown内容
+   * 4. 结构化输出 → 提供清洁、格式化的内容用于显示
+   */
+  const processCozeResponse = async (rawResponse: string): Promise<string> => {
+    try {
+      setIsProcessingData(true);
+      console.log('🔄 开始四步数据处理流程...');
+      
+      // 步骤1: 数据接收 (已通过useCozeStream完成)
+      console.log('✅ 步骤1: 数据接收完成');
+      
+      // 步骤2: 内容分离 - 智能识别并分离JSON和Markdown部分
+      console.log('🔍 步骤2: 开始内容分离...');
+      const extracted = mixedDataExtractor.extractMixedData(rawResponse);
+      setExtractedData(extracted);
+      
+      console.log('📊 分离结果:', {
+        apiCalls: extracted.apiCalls.length,
+        apiResponses: extracted.apiResponses.length,
+        errors: extracted.errors.length,
+        markdownLength: extracted.markdownContent.length,
+        hasProcessedMarkdown: !!extracted.processedMarkdown
+      });
+
+      // 检查是否有错误并进行处理
+      if (extracted.errors.length > 0) {
+        console.warn('⚠️ 检测到错误:', extracted.errors);
+        
+        // 检查是否是手相相关的错误
+        const hasHandReadingError = extracted.errors.some(error => 
+          JSON.stringify(error).includes('手相') || 
+          JSON.stringify(error).includes('shouxiang') ||
+          JSON.stringify(error).includes('can\'t convert to file')
+        );
+        
+        if (hasHandReadingError) {
+          console.log('🤚 检测到手相分析错误，将继续处理其他命理分析内容');
+        }
+      }
+      
+      // 步骤3: Markdown处理 - 深度解析和清理Markdown内容
+      console.log('📝 步骤3: 开始Markdown处理...');
+      let cleanedMarkdown = extracted.markdownContent;
+      
+      // 如果没有提取到markdown内容，尝试从原始响应中提取
+      if (!cleanedMarkdown || cleanedMarkdown.length < 50) {
+        console.log('🔄 Markdown内容不足，尝试备用提取方法...');
+        cleanedMarkdown = mixedDataExtractor.extractMarkdownOnly(rawResponse);
+      }
+      
+      if (extracted.processedMarkdown) {
+        // 使用处理后的markdown内容
+        cleanedMarkdown = extracted.processedMarkdown.cleanedContent;
+        console.log('✨ 使用深度处理的Markdown内容');
+      }
+      
+      // 步骤4: 结构化输出 - 提供清洁、格式化的内容用于显示
+      console.log('🎯 步骤4: 开始结构化输出...');
+      let finalContent = cleanedMarkdown;
+      
+      // 如果仍然没有有效内容，添加错误说明
+      if (!finalContent || finalContent.length < 20) {
+        finalContent = `## 命理分析报告
+
+**数据处理状态：** 部分成功
+
+由于技术原因，部分分析功能暂时不可用：
+- 手相分析功能遇到图片处理问题
+- 其他命理分析正在处理中
+
+请稍后重试或联系技术支持。
+
+---
+
+**原始响应数据：**
+\`\`\`
+${rawResponse.substring(0, 500)}${rawResponse.length > 500 ? '...' : ''}
+\`\`\``;
+      }
+      
+      // 如果有知识卡数据，进行映射处理
+      if (extracted.processedMarkdown) {
+        try {
+          const knowledgeCardData = knowledgeCardMapper.mapToKnowledgeCard(extracted);
+          if (knowledgeCardData && knowledgeCardData.content) {
+            finalContent = knowledgeCardData.content;
+            console.log('🎴 知识卡映射成功');
+          }
+        } catch (error) {
+          console.warn('⚠️ 知识卡映射失败，使用原始内容:', error);
+        }
+      }
+      
+      // 最终的智能内容处理
+      const processedFinalContent = smartContentProcess(finalContent);
+      setProcessedContent(processedFinalContent);
+      
+      console.log('✅ 四步数据处理流程完成!');
+      console.log('📄 最终内容长度:', processedFinalContent.length);
+      
+      return processedFinalContent;
+      
+    } catch (error) {
+      console.error('❌ 数据处理流程出错:', error);
+      
+      // 增强的降级处理
+      let fallbackContent = '';
+      
+      try {
+        // 尝试使用混合数据提取器的备用方法
+        fallbackContent = mixedDataExtractor.extractMarkdownOnly(rawResponse);
+      } catch (extractError) {
+        console.error('❌ 备用提取也失败:', extractError);
+      }
+      
+      // 如果备用提取也失败，提供基本的错误信息
+      if (!fallbackContent || fallbackContent.length < 20) {
+        fallbackContent = `## 命理分析报告
+
+**处理状态：** 遇到技术问题
+
+抱歉，当前无法完整处理您的命理分析请求。可能的原因：
+1. 手相图片格式不支持或文件损坏
+2. 网络连接问题
+3. 服务器临时故障
+
+**建议解决方案：**
+- 请检查上传的手相图片是否清晰完整
+- 稍后重试分析
+- 联系技术支持获取帮助
+
+**错误详情：**
+\`\`\`
+${error.message}
+\`\`\``;
+      }
+      
+      const processedFallbackContent = smartContentProcess(fallbackContent);
+      setProcessedContent(processedFallbackContent);
+      return processedFallbackContent;
+    } finally {
+      setIsProcessingData(false);
+    }
+  };
+
   // 测试数据
   const testAnalysisContent = `您好！我是玄机子，很荣幸能为您分析孩子的命理格局。根据您提供的信息，我需要先确认几个关键点：
 
@@ -133,7 +298,7 @@ const ReportPage = () => {
 
 ---`;
 
-  // 生成分析内容 - 现在调用扣子智能体
+  // 生成分析内容 - 现在调用扣子智能体并集成四步数据处理流程
   const generateAnalysisContent = async () => {
     if (!formData) return '';
     
@@ -147,7 +312,8 @@ const ReportPage = () => {
       birthPlace: formData.birthPlace,
       birthEnvironment: formData.birthEnvironment,
       age: formData.age,
-      palmReading: formData.palmReading
+      palmReading: formData.palmReading,
+      palmReadingFile: formData.palmReadingFile
     };
 
     try {
@@ -191,14 +357,14 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
   // 监听流式分析完成，自动调用 Moonshot API 生成 HTML 知识卡
   useEffect(() => {
     console.log('监听流式完成状态:', {
-      isStreaming: streamState.isStreaming,
-      messagesLength: streamState.messages.length,
+      isStreaming: isStreaming,
+      messagesLength: messages.length,
       hasGeneratedHTML: !!moonshotState.generatedHTML,
-      latestMessage: streamState.messages.length > 0 ? streamState.messages[streamState.messages.length - 1]?.substring(0, 100) + '...' : 'none'
+      latestMessage: messages.length > 0 ? messages[messages.length - 1]?.substring(0, 100) + '...' : 'none'
     });
     
-    if (!streamState.isStreaming && streamState.messages.length > 0 && !moonshotState.generatedHTML) {
-      const latestMessage = streamState.messages[streamState.messages.length - 1];
+    if (!isStreaming && messages.length > 0 && !moonshotState.generatedHTML) {
+      const latestMessage = messages[messages.length - 1];
       if (latestMessage && latestMessage.trim()) {
         console.log('扣子分析完成，开始调用 Moonshot API 生成 HTML 知识卡...');
         console.log('分析内容长度:', latestMessage.length);
@@ -211,11 +377,11 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
     } else {
       console.log('不满足调用 Moonshot API 的条件');
     }
-  }, [streamState.isStreaming, streamState.messages, moonshotState.generatedHTML]);
+  }, [isStreaming, messages, moonshotState.generatedHTML]);
 
   // 超时检测：如果分析超过3分钟，自动显示超时错误
   useEffect(() => {
-    if (streamState.isStreaming) {
+    if (isStreaming) {
       const timeoutTimer = setTimeout(() => {
         setAiAnalysisResult('分析超时：扣子智能体响应时间过长，请稍后重试。可能的原因：网络连接问题、API服务繁忙或token配置错误。');
         // 停止流式处理
@@ -225,38 +391,57 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
       
       return () => clearTimeout(timeoutTimer);
     }
-  }, [streamState.isStreaming, stopStream]);
+  }, [isStreaming, stopStream]);
 
-  // 监听扣子流式响应
+  // 监听扣子流式响应并集成四步数据处理流程
   useEffect(() => {
-    if (streamState.currentMessage) {
+    if (currentMessage) {
       // 实时更新当前流式消息
       setAiAnalysisResult(prev => {
         // 如果是初始提示信息，替换为流式内容
         if (prev.includes('正在调用扣子智能体进行专业命理分析')) {
-          return streamState.currentMessage;
+          return currentMessage;
         }
-        return streamState.currentMessage;
+        return currentMessage;
       });
     }
     
-    // 当有完整消息时，更新结果
-    if (streamState.messages.length > 0) {
-      const latestMessage = streamState.messages[streamState.messages.length - 1];
-      setAiAnalysisResult(latestMessage);
+    // 当有完整消息时，应用四步数据处理流程
+    if (messages.length > 0) {
+      const latestMessage = messages[messages.length - 1];
+      // 应用四步数据处理流程
+      processCozeResponse(latestMessage).then(processedContent => {
+        setAiAnalysisResult(processedContent);
+      }).catch(error => {
+        console.error('四步数据处理失败:', error);
+        setAiAnalysisResult(latestMessage); // 降级使用原始内容
+      });
     }
 
     // 处理错误
-    if (streamState.error) {
-      setAiAnalysisResult(`扣子智能体分析出错：${streamState.error}`);
+     if (streamError) {
+       let errorMessage = streamError;
+      
+      // 针对特定错误提供更友好的提示
+      if (errorMessage.includes('图片文件格式不正确')) {
+        errorMessage = '手相图片格式有误，请重新上传清晰的手相照片（支持JPG、PNG格式）';
+      } else if (errorMessage.includes('请求参数有误')) {
+        errorMessage = '输入信息有误，请检查生日信息是否完整正确';
+      } else if (errorMessage.includes('分析服务暂时不可用')) {
+        errorMessage = '智能分析服务暂时不可用，请稍后重试';
+      } else if (errorMessage.includes('网络连接异常')) {
+        errorMessage = '网络连接不稳定，请检查网络后重试';
+      }
+      
+      setAiAnalysisResult(`分析遇到问题：${errorMessage}\n\n请尝试以下解决方案：\n1. 检查网络连接是否正常\n2. 如果上传了手相图片，请确保图片清晰且格式正确\n3. 稍后重新尝试分析\n4. 如问题持续，请联系客服`);
       setIsAnalyzing(false);
     }
 
     // 流式传输完成
-    if (!streamState.isStreaming && streamState.messages.length > 0) {
+    if (!isStreaming && messages.length > 0) {
       setIsAnalyzing(false);
     }
-  }, [streamState]);
+  }, [isStreaming, currentMessage, messages, streamError]);
 
   // 开始AI分析 - 使用扣子智能体
   const handleStartAIAnalysis = async () => {
@@ -280,8 +465,9 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
     try {
       // 获取最新的分析内容
       let contentToUse = '';
-      if (streamState.messages.length > 0) {
-        contentToUse = streamState.messages[streamState.messages.length - 1];
+ // 优先使用流式处理的内容
+    if (messages.length > 0) {
+      contentToUse = messages[messages.length - 1];
       } else if (aiAnalysisResult) {
         contentToUse = aiAnalysisResult;
       }
@@ -416,15 +602,25 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
           </div>
 
           {/* 生成状态提示 - 在卡片上方 */}
-          {fromBirthday && showAnalyzeHint && (isAnalyzing || streamState.isStreaming) && (
+          {fromBirthday && showAnalyzeHint && (isAnalyzing || isStreaming || isProcessingData) && (
             <div className="mb-6 mx-4">
-              {(isAnalyzing || streamState.isStreaming) ? (
+              {(isAnalyzing || isStreaming || isProcessingData) ? (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                    <span className="text-blue-800 font-medium">扣子智能体正在基于知识库为您深度分析...</span>
+                    <span className="text-blue-800 font-medium">
+                      {isProcessingData 
+                        ? '正在处理数据（内容分离→Markdown处理→结构化输出）...' 
+                        : '扣子智能体正在基于知识库为您深度分析...'
+                      }
+                    </span>
                   </div>
-                  <p className="text-sm text-blue-600">请稍等一盏茶的工夫</p>
+                  <p className="text-sm text-blue-600">
+                    {isProcessingData 
+                      ? '四步数据处理流程进行中' 
+                      : '请稍等一盏茶的工夫'
+                    }
+                  </p>
                 </div>
               ) : (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
@@ -484,25 +680,33 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
               style={{ transform: `scale(${zoomLevel})` }}
             >
               {/* 生成状态提示 */}
-              {streamState.isStreaming && (
+              {(isStreaming || isProcessingData) && (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="flex items-center gap-3 mb-4">
                     <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
                     <span className="text-lg font-medium text-blue-800">
-                      扣子智能体正在基于知识库生成知识卡...
+                      {isProcessingData 
+                        ? '正在进行四步数据处理流程...' 
+                        : '扣子智能体正在基于知识库生成知识卡...'
+                      }
                     </span>
                   </div>
-                  <p className="text-sm text-blue-600">请稍候片刻</p>
+                  <p className="text-sm text-blue-600">
+                    {isProcessingData 
+                      ? '数据接收→内容分离→Markdown处理→结构化输出' 
+                      : '请稍候片刻'
+                    }
+                  </p>
                 </div>
               )}
 
               {/* 错误状态 */}
-              {streamState.error && (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-lg">
-                    <div className="text-center">
-                      <div className="text-red-600 font-medium mb-2">AI分析失败</div>
-                      <div className="text-sm text-red-500 mb-4">{streamState.error}</div>
+               {streamError && (
+                 <div className="flex flex-col items-center justify-center py-12">
+                   <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-lg">
+                     <div className="text-center">
+                       <div className="text-red-600 font-medium mb-2">AI分析失败</div>
+                       <div className="text-sm text-red-500 mb-4">{streamError}</div>
                       <div className="text-xs text-gray-600 mb-4">
                         <p className="mb-2">可能的解决方案：</p>
                         <ul className="text-left space-y-1">
@@ -525,13 +729,13 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
               )}
 
               {/* 流式内容显示 */}
-              {streamState.isStreaming && streamState.currentMessage && (
+              {isStreaming && currentMessage && (
                 <div className="mb-6">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h3 className="text-sm font-medium text-blue-800 mb-2">扣子智能体正在生成中...</h3>
                     <div className="h-32 overflow-y-auto">
                       <div className="text-xs text-blue-700 whitespace-pre-wrap font-mono">
-                        {streamState.currentMessage}
+                        {currentMessage}
                       </div>
                     </div>
                   </div>
@@ -539,19 +743,19 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
               )}
 
               {/* 实时渲染HTML内容 - 流式过程中 */}
-              {streamState.isStreaming && streamState.currentMessage && (
+              {isStreaming && processedHTML && (
                 <div className="mb-6">
                   <div 
                     className="knowledge-card-content prose prose-amber max-w-none"
                     dangerouslySetInnerHTML={{ 
-                      __html: addMarkdownStyles(smartContentProcess(streamState.currentMessage))
+                      __html: processedHTML
                     }}
                   />
                 </div>
               )}
 
               {/* 优先显示 Moonshot 生成的 HTML 知识卡 */}
-              {!streamState.isStreaming && moonshotState.generatedHTML && (
+              {!isStreaming && moonshotState.generatedHTML && (
                 <div className="mb-6">
                   <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-1">
                     <div 
@@ -563,19 +767,19 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
               )}
 
               {/* 如果没有 Moonshot HTML，则显示流式完成后的内容 */}
-              {!streamState.isStreaming && !moonshotState.generatedHTML && streamState.messages.length > 0 && (
+              {!isStreaming && !moonshotState.generatedHTML && processedHTML && (
                 <div className="mb-6">
                   <div 
                     className="knowledge-card-content prose prose-amber max-w-none"
                     dangerouslySetInnerHTML={{ 
-                      __html: addMarkdownStyles(smartContentProcess(streamState.messages[streamState.messages.length - 1]))
+                      __html: processedHTML
                     }}
                   />
                 </div>
               )}
 
               {/* 显示AI分析结果 - 如果没有其他内容的话 */}
-              {!streamState.isStreaming && !moonshotState.generatedHTML && streamState.messages.length === 0 && aiAnalysisResult && (
+              {!isStreaming && !moonshotState.generatedHTML && messages.length === 0 && aiAnalysisResult && (
                 <div className="mb-6">
                   <div 
                     className="knowledge-card-content prose prose-amber max-w-none"
@@ -587,7 +791,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
               )}
 
               {/* 空状态 - 显示默认图片 */}
-              {!streamState.isStreaming && streamState.messages.length === 0 && !aiAnalysisResult && !streamState.error && (
+               {!isStreaming && messages.length === 0 && !aiAnalysisResult && !streamError && (
                 <div className="flex flex-col items-center justify-center">
                   <img 
                     src="/lovable-uploads/f705bd19-34cd-4afa-894e-12b414403c8e.png" 

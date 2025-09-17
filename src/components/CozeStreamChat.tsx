@@ -30,7 +30,7 @@ export default function CozeStreamChat({
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [streamState.messages, streamState.currentMessage]);
+  }, [streamState.messages, streamState.processedHTML]);
 
   return (
     <Card className={`w-full max-w-4xl mx-auto ${className}`}>
@@ -77,21 +77,22 @@ export default function CozeStreamChat({
             ))}
             
             {/* 显示当前流式消息 */}
-            {streamState.currentMessage && (
+            {streamState.processedHTML && (
               <div className="flex justify-end">
                 <div className="max-w-[80%] bg-amber-100 rounded-lg p-3 shadow-sm">
-                  <div className="text-sm text-amber-800 whitespace-pre-wrap">
-                    {streamState.currentMessage}
-                    {streamState.isStreaming && (
-                      <span className="inline-block w-2 h-4 bg-amber-600 ml-1 animate-pulse" />
-                    )}
-                  </div>
+                  <div 
+                    className="text-sm text-amber-800 prose prose-amber prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: streamState.processedHTML }}
+                  />
+                  {streamState.isStreaming && (
+                    <span className="inline-block w-2 h-4 bg-amber-600 ml-1 animate-pulse" />
+                  )}
                 </div>
               </div>
             )}
             
             {/* 加载状态 */}
-            {streamState.isStreaming && !streamState.currentMessage && streamState.messages.length === 0 && (
+            {streamState.isStreaming && !streamState.processedHTML && streamState.messages.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <div className="flex items-center gap-2 text-amber-600">
                   <Loader2 className="w-5 h-5 animate-spin" />

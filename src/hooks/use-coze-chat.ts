@@ -20,7 +20,8 @@ export function useCozeChat(): UseCozeChatReturn {
   const [cozeAPI] = useState(() => new CozeAPI({
     botId: 'configured-in-backend',
     userId: 'user_' + Date.now(),
-    accessToken: 'configured-in-backend'
+    token: 'configured-in-backend',
+    nickname: '用户'
   }));
 
   const clearError = useCallback(() => {

@@ -8,6 +8,7 @@ import OAuthAuth from '@/components/OAuthAuth';
 import OAuthTestComponent from '@/components/OAuthTestComponent';
 import APITestTool from '@/components/APITestTool';
 import OAuthDiagnostic from '@/components/OAuthDiagnostic';
+import { CozeStreamTest } from '@/components/CozeStreamTest';
 import { getCozeConfig, validateCozeConfig } from '@/lib/coze-config';
 
 const CozeTestPage: React.FC = () => {
@@ -248,12 +249,25 @@ VITE_COZE_USE_JWT=false`}
           </CardContent>
         </Card>
 
+        {/* 流式 API 测试 */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5" />
+              流式 API 测试 (新版本)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CozeStreamTest />
+          </CardContent>
+        </Card>
+
         {/* API 测试工具 */}
         <Card className="mt-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TestTube className="w-5 h-5" />
-              API 测试工具
+              API 测试工具 (旧版本)
             </CardTitle>
           </CardHeader>
           <CardContent>

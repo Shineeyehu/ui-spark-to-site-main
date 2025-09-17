@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HelpCircle, X, ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
+import { HelpCircle, X, ArrowLeft, Sparkles, Loader2, CheckCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -27,6 +27,7 @@ interface FormData {
   birthEnvironment: string;
   age?: string;
   palmReading?: string;
+  palmReadingFile?: string; // base64格式的图片文件
 }
 
 const BirthdayForm = () => {
@@ -53,6 +54,16 @@ const BirthdayForm = () => {
     palmReading: ''
   });
 
+  const [fileUploadStatus, setFileUploadStatus] = useState<{
+    isUploading: boolean;
+    error: string | null;
+    success: boolean;
+  }>({
+    isUploading: false,
+    error: null,
+    success: false
+  });
+
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [tempTime, setTempTime] = useState({ hours: '18', minutes: '05' });
@@ -75,7 +86,12 @@ const BirthdayForm = () => {
   
   // 流式响应相关状态
   const {
-    streamState,
+    isStreaming,
+    error: streamError,
+    messages: streamMessages,
+    streamContent,
+    conversationId,
+    connectionStatus,
     startBirthAnalysis,
     stopStream,
     clearMessages
@@ -232,7 +248,16 @@ const BirthdayForm = () => {
             </div>
             
             <CozeStreamChat
-              streamState={streamState}
+              streamState={{
+                isStreaming,
+                error: streamError,
+                messages: streamMessages,
+                streamContent,
+                conversationId,
+                connectionStatus,
+                retryCount: 0,
+                lastEventTime: null
+              }}
               onStop={stopStream}
               onClear={clearMessages}
               title="命理分析助手"
@@ -585,14 +610,91 @@ const BirthdayForm = () => {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    updateFormData('palmReading', file.name);
+                    // 重置状态
+                    setFileUploadStatus({
+                      isUploading: true,
+                      error: null,
+                      success: false
+                    });
+                    
+                    // 检查文件大小（限制为5MB）
+                    if (file.size > 5 * 1024 * 1024) {
+                      setFileUploadStatus({
+                        isUploading: false,
+                        error: '图片文件大小不能超过5MB，请选择更小的文件',
+                        success: false
+                      });
+                      return;
+                    }
+                    
+                    // 检查文件类型
+                    if (!file.type.startsWith('image/')) {
+                      setFileUploadStatus({
+                        isUploading: false,
+                        error: '请选择图片文件（支持JPG、PNG、GIF等格式）',
+                        success: false
+                      });
+                      return;
+                    }
+                    
+                    // 转换为base64
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      try {
+                        const base64String = event.target?.result as string;
+                        updateFormData('palmReading', file.name);
+                        updateFormData('palmReadingFile', base64String);
+                        setFileUploadStatus({
+                          isUploading: false,
+                          error: null,
+                          success: true
+                        });
+                      } catch (error) {
+                        setFileUploadStatus({
+                          isUploading: false,
+                          error: '文件处理失败，请重试',
+                          success: false
+                        });
+                      }
+                    };
+                    reader.onerror = () => {
+                      setFileUploadStatus({
+                        isUploading: false,
+                        error: '文件读取失败，请检查文件是否损坏',
+                        success: false
+                      });
+                    };
+                    reader.readAsDataURL(file);
+                  } else {
+                    // 清除文件
+                    updateFormData('palmReading', '');
+                    updateFormData('palmReadingFile', '');
+                    setFileUploadStatus({
+                      isUploading: false,
+                      error: null,
+                      success: false
+                    });
                   }
                 }}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
-              <div className={`bg-gray-50 border border-gray-200 rounded-lg h-10 flex items-center justify-center text-gray-700 font-normal hover:bg-gray-100 transition-colors`}>
-                {formData.palmReading ? (
-                  <span className="text-xs text-gray-600 truncate px-2">{formData.palmReading}</span>
+              <div className={`bg-gray-50 border rounded-lg h-10 flex items-center justify-center text-gray-700 font-normal hover:bg-gray-100 transition-colors ${
+                fileUploadStatus.error ? 'border-red-300 bg-red-50' : 
+                fileUploadStatus.success ? 'border-green-300 bg-green-50' : 
+                'border-gray-200'
+              }`}>
+                {fileUploadStatus.isUploading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-xs">上传中...</span>
+                  </div>
+                ) : fileUploadStatus.error ? (
+                  <span className="text-xs text-red-600 px-2">{fileUploadStatus.error}</span>
+                ) : formData.palmReading ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span className="text-xs text-green-600 truncate px-1">{formData.palmReading}</span>
+                  </div>
                 ) : (
                   <span>点击上传手相图片</span>
                 )}
@@ -615,7 +717,7 @@ const BirthdayForm = () => {
                   : 'bg-gray-300 hover:bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed'
               } disabled:opacity-50`}
             >
-              {streamState.isStreaming ? (
+              {isStreaming ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   AI 分析中...

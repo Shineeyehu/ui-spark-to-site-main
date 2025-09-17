@@ -442,8 +442,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${validToken}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'Coze-Client/1.0',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody),
       });

@@ -16,7 +16,7 @@ export function checkCozeConfig(): ConfigStatus {
     missingFields.push('VITE_COZE_BOT_ID');
   }
 
-  if (!defaultCozeConfig.accessToken || defaultCozeConfig.accessToken === 'your_access_token') {
+  if (!defaultCozeConfig.token || defaultCozeConfig.token === 'your_access_token') {
     missingFields.push('VITE_COZE_ACCESS_TOKEN');
   }
 

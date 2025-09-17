@@ -35,6 +35,19 @@ export interface ExtractedCozeData {
   rawData: string;
 }
 
+export interface ExtractedData {
+  type: 'analysis' | 'report' | 'mixed';
+  content: string;
+  metadata?: {
+    timestamp?: string;
+    source?: string;
+    format?: string;
+  };
+  sections?: {
+    [key: string]: string;
+  };
+}
+
 export class CozeMixedDataExtractor {
   private markdownProcessor: MarkdownProcessor;
 
@@ -110,7 +123,48 @@ export class CozeMixedDataExtractor {
    * 分割混合数据
    */
   private splitMixedData(data: string): string[] {
-    // 使用正则表达式分割JSON对象和markdown内容
+    const parts: string[] = [];
+    
+    // 首先尝试识别和分离RPC错误
+    const rpcErrorPattern = /RPCError\{[^}]*\}[^}]*\}/g;
+    let cleanedData = data;
+    let match;
+    
+    while ((match = rpcErrorPattern.exec(data)) !== null) {
+      parts.push(match[0]);
+      cleanedData = cleanedData.replace(match[0], '|||SPLIT|||');
+    }
+    
+    // 分离其他JSON对象
+    const jsonPattern = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+    while ((match = jsonPattern.exec(cleanedData)) !== null) {
+      if (!match[0].includes('|||SPLIT|||')) {
+        parts.push(match[0]);
+        cleanedData = cleanedData.replace(match[0], '|||SPLIT|||');
+      }
+    }
+    
+    // 提取剩余的非JSON内容（主要是Markdown）
+    const remainingParts = cleanedData.split('|||SPLIT|||');
+    for (const part of remainingParts) {
+      const trimmed = part.trim();
+      if (trimmed && !this.isJsonLike(trimmed)) {
+        parts.push(trimmed);
+      }
+    }
+    
+    // 备用方法：如果上述方法没有找到足够的内容，使用原始的大括号平衡方法
+    if (parts.length === 0) {
+      return this.splitMixedDataFallback(data);
+    }
+    
+    return parts.filter(part => part.trim().length > 0);
+  }
+
+  /**
+   * 备用的数据分割方法
+   */
+  private splitMixedDataFallback(data: string): string[] {
     const parts: string[] = [];
     let currentPart = '';
     let braceCount = 0;
@@ -204,14 +258,36 @@ export class CozeMixedDataExtractor {
     if (jsonData.name && jsonData.arguments) {
       // API调用
       apiCalls.push(jsonData as CozeApiCall);
-    } else if (jsonData.error || jsonData.message || 
-               (typeof jsonData === 'string' && jsonData.includes('Error'))) {
-      // 错误响应
+    } else if (this.isErrorData(jsonData)) {
+      // 错误响应 - 增强错误检测
       errors.push(jsonData as CozeErrorResponse);
     } else if (typeof jsonData === 'object' && jsonData !== null) {
       // API响应
       apiResponses.push(jsonData as CozeApiResponse);
     }
+  }
+
+  /**
+   * 增强的错误检测方法
+   */
+  private isErrorData(data: any): boolean {
+    if (typeof data === 'string') {
+      return data.includes('Error') || 
+             data.includes('RPCError') || 
+             data.includes('BizStatusMessage') ||
+             data.includes('请求参数不合法') ||
+             data.includes('can\'t convert to file');
+    }
+    
+    if (typeof data === 'object' && data !== null) {
+      return !!(data.error || 
+                data.message || 
+                data.BizStatusMessage ||
+                data.OriginalErr ||
+                (data.msg_type && data.msg_type.includes('error')));
+    }
+    
+    return false;
   }
 
   /**
@@ -248,16 +324,38 @@ export class CozeMixedDataExtractor {
    * 备用markdown提取方法
    */
   private extractMarkdownFallback(data: string): string {
+    // 首先移除明显的错误信息
+    let cleanedData = data
+      .replace(/RPCError\{[^}]*\}[^}]*\}/g, '') // 移除RPC错误
+      .replace(/\{"msg_type":"[^"]*","data":"[^"]*"[^}]*\}/g, '') // 移除消息类型JSON
+      .replace(/\{"name":"[^"]*","arguments":\{[^}]*\}[^}]*\}/g, ''); // 移除API调用
+
     // 寻找markdown模式的内容
-    const markdownStart = data.search(/#{1,6}\s+/);
+    const markdownStart = cleanedData.search(/#{1,6}\s+/);
     if (markdownStart !== -1) {
-      return data.substring(markdownStart).trim();
+      return cleanedData.substring(markdownStart).trim();
+    }
+
+    // 寻找【】格式的中文标题
+    const chineseTitleMatch = cleanedData.match(/【[^】]+】[\s\S]*$/);
+    if (chineseTitleMatch) {
+      return chineseTitleMatch[0].trim();
     }
 
     // 寻找包含中文和markdown格式的部分
-    const chineseMarkdownMatch = data.match(/[##\*\-].*[\u4e00-\u9fa5].*$/s);
+    const chineseMarkdownMatch = cleanedData.match(/[##\*\-].*[\u4e00-\u9fa5].*$/s);
     if (chineseMarkdownMatch) {
       return chineseMarkdownMatch[0].trim();
+    }
+
+    // 最后尝试：寻找任何包含中文的连续文本块
+    const chineseTextBlocks = cleanedData.match(/[\u4e00-\u9fa5][^{}]*[\u4e00-\u9fa5][^{}]*/g);
+    if (chineseTextBlocks && chineseTextBlocks.length > 0) {
+      // 选择最长的中文文本块
+      const longestBlock = chineseTextBlocks.reduce((longest, current) => 
+        current.length > longest.length ? current : longest
+      );
+      return longestBlock.trim();
     }
 
     return '';
