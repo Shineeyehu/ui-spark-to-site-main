@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, User, Bot, Loader2, ArrowDown } from 'lucide-react';
 import HTMLRenderErrorBoundary from './HTMLRenderErrorBoundary';
+import { extractOverviewSection, markdownToHtml, addMarkdownStyles } from '@/lib/markdown-utils';
 
 interface Message {
   id: string;
@@ -625,6 +626,27 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       console.log('提取的助手内容:', assistantContent);
 
       if (assistantContent) {
+        // 可选：先提取“命主信息概览”并作为独立卡片插入
+        try {
+          const overviewMd = extractOverviewSection(assistantContent);
+          if (overviewMd && overviewMd.trim()) {
+            const overviewHtml = addMarkdownStyles(markdownToHtml(overviewMd));
+            setMessages(prev => {
+              const newMessages = [...prev];
+              // 在最后一条助手消息前插入概览卡
+              const idx = newMessages.length - 1;
+              const insertIndex = Math.max(0, idx);
+              newMessages.splice(insertIndex, 0, {
+                id: `overview-${Date.now()}`,
+                content: overviewHtml,
+                role: 'assistant',
+                timestamp: new Date(),
+              });
+              return newMessages;
+            });
+          }
+        } catch {}
+
         setMessages(prev => {
           const newMessages = [...prev];
           const lastMessage = newMessages[newMessages.length - 1];
@@ -957,6 +979,16 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
                        <div className="mt-4 text-xs text-blue-700 bg-blue-100 rounded-lg p-2">
                          🤖 基于现代AI技术的命理解读，可与传统分析对比参考
                        </div>
+                     </div>
+                   ) : message.id.startsWith('overview-') ? (
+                     // 概览卡片（HTML 渲染）
+                     <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-6 shadow-lg">
+                       <HTMLRenderErrorBoundary>
+                         <div 
+                           className="knowledge-card-content prose prose-amber max-w-none"
+                           dangerouslySetInnerHTML={{ __html: processHTMLContent(message.content) }}
+                         />
+                       </HTMLRenderErrorBoundary>
                      </div>
                    ) : (
                      <div className="text-sm leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">

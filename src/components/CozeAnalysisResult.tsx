@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { smartContentProcess, addMarkdownStyles } from '@/lib/markdown-utils';
 import { 
   Sparkles, 
   User, 
@@ -40,8 +41,58 @@ const CozeAnalysisResult: React.FC<CozeAnalysisResultProps> = ({
 }) => {
   // 解析分析结果，提取关键信息
   const parseAnalysisResult = (result: string) => {
-    const sections = result.split(/\n(?=\d+\.|【|##)/);
-    return sections.map(section => section.trim()).filter(section => section.length > 0);
+    if (!result || result.trim().length === 0) {
+      return ['暂无分析结果'];
+    }
+
+    // 首先清理可能残留的技术信息，但保留命理报告内容
+    let cleanResult = result
+      // 只移除明显的JSON格式技术信息（小于100字符的JSON）
+      .replace(/^\s*\{[^}]{0,100}\}\s*$/gm, '')
+      // 移除明确的技术相关行
+      .replace(/^.*(?:plugin_id|api_id|plugin_name|conversation_id|message_id|tool_call).*$/gm, '')
+      // 移除过多的空行
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    // 如果清理后内容为空，返回原始内容（可能是完整的命理报告）
+    if (!cleanResult || cleanResult.length < 20) {
+      // 尝试使用原始内容，只做基本清理
+      cleanResult = result
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      
+      if (!cleanResult) {
+        return ['分析结果正在生成中，请稍候...'];
+      }
+    }
+
+    // 按照标题和段落分割内容，支持多种格式
+    const sections = cleanResult.split(/\n(?=\d+\.|【|##|#\s*【|\*\*.*\*\*|一、|二、|三、|四、|五、)/);
+    
+    // 过滤和清理每个段落，但保留更多内容
+    const filteredSections = sections
+      .map(section => section.trim())
+      .filter(section => {
+        // 过滤掉空段落
+        if (section.length === 0) return false;
+        
+        // 只过滤掉明显的技术信息短段落
+        const technicalKeywords = ['plugin_id', 'api_id', 'tool_call'];
+        if (technicalKeywords.some(keyword => section.includes(keyword)) && section.length < 50) {
+          return false;
+        }
+        
+        // 保留所有有意义的内容，包括较短的段落
+        return section.length > 2;
+      });
+
+    // 如果没有有效段落，返回原始内容
+    if (filteredSections.length === 0) {
+      return [cleanResult];
+    }
+
+    return filteredSections;
   };
 
   const analysisSections = parseAnalysisResult(analysisResult);
@@ -113,9 +164,9 @@ const CozeAnalysisResult: React.FC<CozeAnalysisResultProps> = ({
                     <div key={index} className="space-y-2">
                       <div className="prose prose-sm max-w-none">
                         <div 
-                          className="text-gray-700 leading-relaxed whitespace-pre-wrap"
+                          className="text-gray-700 leading-relaxed"
                           dangerouslySetInnerHTML={{ 
-                            __html: section.replace(/\n/g, '<br/>') 
+                            __html: addMarkdownStyles(smartContentProcess(section))
                           }}
                         />
                       </div>

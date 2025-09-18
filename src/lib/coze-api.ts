@@ -43,6 +43,7 @@ export interface BirthInfo {
   birthEnvironment: string;
   age?: string;
   palmReading?: string;
+  palmReadingFile?: File;
 }
 
 class CozeAPI {
@@ -134,6 +135,194 @@ class CozeAPI {
    */
   async createConversation(): Promise<string> {
     return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * 清理内容，只保留markdown报告部分
+   */
+  /**
+   * 判断是否应该过滤掉某个数据
+   */
+  private shouldFilterData(data: any): boolean {
+    // 过滤verbose类型的数据
+    if (data.type === 'verbose') {
+      return true;
+    }
+    
+    // 过滤knowledge_recall相关数据
+    if (data.content_type === 'knowledge_recall' || 
+        (data.content && data.content.includes('knowledge_recall'))) {
+      return true;
+    }
+    
+    // 过滤follow_up相关数据
+    if (data.content_type === 'follow_up' || 
+        (data.content && data.content.includes('follow_up'))) {
+      return true;
+    }
+    
+    // 过滤工具调用相关数据
+    if (data.content_type === 'tool_call' || 
+        data.content_type === 'tool_response' ||
+        (data.content && (data.content.includes('plugin_id') || 
+                         data.content.includes('api_id') ||
+                         data.content.includes('plugin_name')))) {
+      return true;
+    }
+    
+    // 过滤元数据和系统消息
+    if (data.role === 'system' || 
+        data.content_type === 'metadata' ||
+        (data.content && data.content.startsWith('{'))) {
+      return true;
+    }
+    
+    // 过滤空内容或只包含空白字符的内容
+    if (!data.content || data.content.trim().length === 0) {
+      return true;
+    }
+    
+    // 过滤只包含技术信息的内容
+    const technicalKeywords = [
+      'conversation_id', 'message_id', 'plugin_execution',
+      'api_response', 'tool_execution', 'workflow_step'
+    ];
+    
+    if (data.content && technicalKeywords.some(keyword => 
+        data.content.includes(keyword) && data.content.length < 200)) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  private cleanMarkdownContent(content: string): string {
+    try {
+      // 首先移除所有JSON格式的数据
+      let cleanContent = content.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
+      
+      // 移除技术相关的行和错误信息
+      const technicalPatterns = [
+        /^.*(?:plugin_id|api_id|plugin_name|plugin_type|arguments|tool_call|tool_response).*$/gm,
+        /^.*(?:conversation_id|message_id|workflow_step|api_response).*$/gm,
+        /^.*(?:knowledge_recall|follow_up|metadata).*$/gm,
+        /^\s*```json[\s\S]*?```\s*$/gm, // 移除JSON代码块
+        /^\s*\[.*\]\s*$/gm, // 移除数组格式的行
+        /RPCError\{[^}]*\}/g, // 移除RPCError信息
+        /BizStatusCode:\[[^\]]*\]/g, // 移除状态码
+        /BizStatusMessage:\[[^\]]*\]/g, // 移除状态消息
+        /PSM:\[[^\]]*\]/g, // 移除PSM信息
+        /Method:\[[^\]]*\]/g, // 移除方法信息
+        /ErrType:\[[^\]]*\]/g, // 移除错误类型
+        /OriginalErr:\[[^\]]*\]/g, // 移除原始错误
+      ];
+      
+      technicalPatterns.forEach(pattern => {
+        cleanContent = cleanContent.replace(pattern, '');
+      });
+      
+      // 优先查找命理报告的标志性内容
+      const reportMarkers = [
+        /【命主信息概览】/,
+        /##\s*【命主信息概览】/,
+        /核心命理分析报告/,
+        /天赋挖掘与成长建议/,
+        /性格特质与教养指南/,
+        /玄机子大师结语/
+      ];
+      
+      let reportStart = -1;
+      for (const marker of reportMarkers) {
+        reportStart = cleanContent.search(marker);
+        if (reportStart !== -1) break;
+      }
+      
+      // 如果找到了命理报告内容，从该位置开始截取
+      if (reportStart !== -1) {
+        cleanContent = cleanContent.substring(reportStart);
+        console.log('找到命理报告内容，长度:', cleanContent.length);
+      } else {
+        // 如果没找到标志性内容，查找其他有意义的markdown内容
+        const meaningfulStart = cleanContent.search(/(?:您好|尊敬的|根据您提供|经过分析|##\s*【|#\s*【)/);
+        if (meaningfulStart !== -1) {
+          cleanContent = cleanContent.substring(meaningfulStart);
+        }
+      }
+      
+      // 进一步清理内容
+      cleanContent = cleanContent
+        // 移除多余的空行
+        .replace(/\n{3,}/g, '\n\n')
+        // 移除行首行尾的空白
+        .replace(/^\s+|\s+$/gm, '')
+        // 移除只包含特殊字符的行
+        .replace(/^[^\w\u4e00-\u9fff]*$/gm, '')
+        .trim();
+      
+      // 检查清理后的内容是否有意义
+      if (cleanContent.length < 50) {
+        console.log('清理后内容过短，返回原始内容');
+        return content.trim();
+      }
+      
+      // 检查是否包含命理分析的关键词
+      const keyWords = ['命主', '八字', '紫微', '性格', '天赋', '建议', '分析'];
+      const hasKeyWords = keyWords.some(keyword => cleanContent.includes(keyword));
+      
+      if (!hasKeyWords && cleanContent.length < 200) {
+        console.log('内容不包含关键词且较短，可能不是有效的命理分析');
+        return '';
+      }
+      
+      console.log('清理后的内容长度:', cleanContent.length);
+      return cleanContent;
+    } catch (error) {
+      console.error('清理markdown内容时出错:', error);
+      return content;
+    }
+  }
+
+  /**
+   * 上传文件到Coze
+   */
+  async uploadFile(file: File): Promise<string> {
+    try {
+      const token = await this.getValidToken();
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('https://api.coze.cn/v1/files/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json', // 添加Accept头
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('文件上传失败:', errorText);
+        throw new Error(`文件上传失败: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('文件上传成功:', result);
+      
+      // 根据Coze API v3响应格式调整
+      if (result.data && result.data.id) {
+        return result.data.id;
+      } else if (result.id) {
+        return result.id;
+      } else {
+        console.error('文件上传响应格式:', result);
+        throw new Error('文件上传响应格式不正确');
+      }
+    } catch (error) {
+      console.error('文件上传错误:', error);
+      throw error;
+    }
   }
 
   /**
@@ -238,12 +427,20 @@ class CozeAPI {
       
       console.log('开始读取流式响应...');
 
+      let buffer = ''; // 用于缓存不完整的数据
+      let currentEvent = 'conversation.message.delta'; // 默认事件类型
+
       const stream = new ReadableStream<CozeStreamResponse>({
         start(controller) {
           function pump(): Promise<void> {
             return reader.read().then(({ done, value }) => {
               if (done) {
                 console.log('流式响应结束');
+                // 处理缓冲区中剩余的数据
+                if (buffer.trim()) {
+                  console.log('处理缓冲区剩余数据:', buffer);
+                  processBufferedData(buffer, controller);
+                }
                 controller.close();
                 onComplete?.();
                 return;
@@ -251,52 +448,85 @@ class CozeAPI {
 
               const chunk = decoder.decode(value, { stream: true });
               console.log('接收到数据块:', chunk.substring(0, 200) + (chunk.length > 200 ? '...' : ''));
-              const lines = chunk.split('\n');
+              
+              // 将新数据添加到缓冲区
+              buffer += chunk;
+              
+              // 按行分割，保留最后一个可能不完整的行
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || ''; // 保留最后一行（可能不完整）
 
               for (const line of lines) {
-                console.log('处理行:', line);
-                // 处理标准SSE格式：data:开头的行（注意没有空格）
-                if (line.startsWith('data:')) {
-                  try {
-                    const data = line.slice(5); // 移除'data:'前缀
-                    console.log('提取的数据:', data);
-                    
-                    if (data === '[DONE]') {
-                      console.log('收到结束标记 [DONE]');
-                      controller.close();
-                      onComplete?.();
-                      return;
-                    }
-                    
-                    const parsed = JSON.parse(data);
-                    console.log('解析的数据:', parsed);
-                    
-                    const streamResponse: CozeStreamResponse = {
-                      event: 'conversation.message.delta',
-                      data: data,
-                      conversation_id: parsed.conversation_id,
-                      message_id: parsed.id,
-                      role: parsed.role,
-                      content: parsed.content,
-                      content_type: parsed.content_type,
-                      type: parsed.type
-                    };
-                    
-                    console.log('构造的流响应:', streamResponse);
-                    controller.enqueue(streamResponse);
-                    onMessage?.(streamResponse);
-                  } catch (e) {
-                    console.warn('解析SSE数据失败:', line.slice(5), e);
-                  }
-                } else if (line.startsWith('event:')) {
-                  console.log('事件类型:', line);
-                } else if (line.trim()) {
-                  console.log('其他行:', line);
-                }
+                processSSELine(line, controller);
               }
 
               return pump();
             });
+          }
+
+          function processSSELine(line: string, controller: ReadableStreamDefaultController<CozeStreamResponse>) {
+            console.log('处理行:', line);
+            // 处理标准SSE格式：data:开头的行（注意没有空格）
+            if (line.startsWith('data:')) {
+              try {
+                const data = line.slice(5).trim(); // 移除'data:'前缀并去除空白
+                console.log('提取的数据:', data);
+                
+                if (data === '[DONE]') {
+                  console.log('收到结束标记');
+                  controller.close();
+                  onComplete?.();
+                  return;
+                }
+                
+                // 检查数据是否为空或无效
+                if (!data || data === '') {
+                  console.log('跳过空数据行');
+                  return;
+                }
+                
+                const parsed = JSON.parse(data);
+                console.log('解析的数据:', parsed);
+                
+                // 验证解析的数据结构
+                if (!parsed || typeof parsed !== 'object') {
+                  console.warn('解析的数据格式无效:', parsed);
+                  return;
+                }
+                
+                const streamResponse: CozeStreamResponse = {
+                  event: currentEvent,
+                  data: data,
+                  conversation_id: parsed.conversation_id,
+                  message_id: parsed.id,
+                  role: parsed.role,
+                  content: parsed.content,
+                  content_type: parsed.content_type,
+                  type: parsed.type
+                };
+                
+                console.log('构造的流响应:', streamResponse);
+                controller.enqueue(streamResponse);
+                onMessage?.(streamResponse);
+              } catch (e) {
+                console.warn('解析SSE数据失败，跳过此行:', line.slice(5), e);
+                // 不中断整个流程，继续处理下一行
+              }
+            } else if (line.startsWith('event:')) {
+              currentEvent = line.slice(6).trim(); // 更新当前事件类型
+              console.log('事件类型:', currentEvent);
+            } else if (line.trim()) {
+              console.log('其他行:', line);
+            }
+          }
+
+          function processBufferedData(data: string, controller: ReadableStreamDefaultController<CozeStreamResponse>) {
+            const lines = data.split('\n');
+            for (const line of lines) {
+              if (line.trim()) {
+                processSSELine(line, controller);
+              }
+            }
           }
 
           return pump();
@@ -330,6 +560,27 @@ class CozeAPI {
       const token = await this.getValidToken();
       console.log('Token获取成功，长度:', token.length);
       
+      // 如果有手相文件，先上传文件
+      let palmReadingFileId = '';
+      let palmReadingText = '';
+      if (birthInfo.palmReadingFile) {
+        console.log('检测到手相文件，开始上传...');
+        try {
+          palmReadingFileId = await this.uploadFile(birthInfo.palmReadingFile);
+          console.log('手相文件上传成功，文件ID:', palmReadingFileId);
+          palmReadingText = `已上传手相照片，文件ID: ${palmReadingFileId}`;
+        } catch (uploadError) {
+          console.error('手相文件上传失败:', uploadError);
+          // 文件上传失败时，继续进行基础命理分析，但不包含手相部分
+          palmReadingText = '手相文件上传失败，将基于生辰八字进行基础命理分析。建议稍后重新上传清晰的手相照片以获得完整分析。';
+          console.log('手相文件上传失败，继续进行基础命理分析');
+        }
+      } else if (birthInfo.palmReading) {
+        // 如果没有文件但有文件名，说明是旧的数据格式，提示用户重新上传
+        palmReadingText = '请重新上传手相照片文件，而非文件名。当前将基于生辰八字进行基础分析。';
+        console.log('检测到文件名而非文件对象，继续进行基础分析');
+      }
+      
       // 创建AbortController用于超时控制
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
@@ -352,7 +603,7 @@ class CozeAPI {
 ${birthInfo.birthEnvironment}
 
 **手相信息：**
-${birthInfo.palmReading || '未提供'}
+${palmReadingText || '未提供'}
 
 请根据以上信息，进行"天地双盘+手相，参合互证"的深度分析，提供详细的命理分析报告，包括：
 1. 命主信息概览
@@ -384,7 +635,7 @@ ${birthInfo.palmReading || '未提供'}
             "出生地": birthInfo.birthPlace,
             "出生环境": birthInfo.birthEnvironment,
             "年龄": birthInfo.age || "",
-            "手相": birthInfo.palmReading || ""
+            "手相": palmReadingFileId ? JSON.stringify({"file_id": palmReadingFileId}) : ""
           }
         },
         enable_card: false,
@@ -465,10 +716,13 @@ ${birthInfo.palmReading || '未提供'}
               extractedContent = stringValues.length > 0 ? stringValues[0] : jsonText;
             }
             
+            // 清理内容，只保留markdown报告部分
+            const cleanedContent = this.cleanMarkdownContent(extractedContent);
+            
             onMessage({
               event: 'message',
               data: jsonText,
-              content: extractedContent,
+              content: cleanedContent,
               role: 'assistant',
               type: 'text'
             });
@@ -492,12 +746,21 @@ ${birthInfo.palmReading || '未提供'}
       const decoder = new TextDecoder();
       console.log('开始读取流式响应...');
 
-      const stream = new ReadableStream<CozeStreamResponse>({
+      let buffer = ''; // 用于缓存不完整的数据
+      let currentEvent = 'conversation.message.delta'; // 默认事件类型
+      const self = this; // 保存this引用
+
+              const stream = new ReadableStream<CozeStreamResponse>({
         start(controller) {
           function pump(): Promise<void> {
             return reader.read().then(({ done, value }) => {
               if (done) {
                 console.log('流式响应读取完成');
+                // 处理缓冲区中剩余的数据
+                if (buffer.trim()) {
+                  console.log('处理缓冲区剩余数据:', buffer);
+                  processBufferedData(buffer, controller);
+                }
                 controller.close();
                 onComplete?.();
                 return;
@@ -505,51 +768,102 @@ ${birthInfo.palmReading || '未提供'}
 
               const chunk = decoder.decode(value, { stream: true });
               console.log('接收到数据块:', chunk);
-              const lines = chunk.split('\n');
-              console.log('分割后的行数:', lines.length);
+              
+              // 将新数据添加到缓冲区
+              buffer += chunk;
+              
+              // 按行分割，保留最后一个可能不完整的行
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || ''; // 保留最后一行（可能不完整）
+              
+              console.log('处理完整行数:', lines.length, '缓冲区剩余:', buffer.length);
 
               for (const line of lines) {
-                console.log('处理行:', line);
-                // 处理标准SSE格式：data:开头的行（注意没有空格）
-                if (line.startsWith('data:')) {
-                  try {
-                    const data = line.slice(5); // 移除'data:'前缀
-                    console.log('提取的数据:', data);
-                    if (data === '[DONE]') {
-                      console.log('收到结束标记');
-                      controller.close();
-                      onComplete?.();
-                      return;
-                    }
-                    
-                    const parsed = JSON.parse(data);
-                    console.log('解析的数据:', parsed);
-                    const streamResponse: CozeStreamResponse = {
-                      event: 'conversation.message.delta',
-                      data: data,
-                      conversation_id: parsed.conversation_id,
-                      message_id: parsed.id,
-                      role: parsed.role,
-                      content: parsed.content,
-                      content_type: parsed.content_type,
-                      type: parsed.type
-                    };
-                    
-                    console.log('构造的流响应:', streamResponse);
-                    controller.enqueue(streamResponse);
-                    onMessage?.(streamResponse);
-                  } catch (e) {
-                    console.warn('解析SSE数据失败:', line.slice(5), e);
-                  }
-                } else if (line.startsWith('event:')) {
-                  console.log('事件类型:', line);
-                } else if (line.trim()) {
-                  console.log('其他行:', line);
-                }
+                processSSELine(line, controller);
               }
 
               return pump();
             });
+          }
+
+          function processSSELine(line: string, controller: ReadableStreamDefaultController<CozeStreamResponse>) {
+            console.log('处理行:', line);
+            // 处理标准SSE格式：data:开头的行（注意没有空格）
+            if (line.startsWith('data:')) {
+              try {
+                const data = line.slice(5).trim(); // 移除'data:'前缀并去除空白
+                console.log('提取的数据:', data);
+                
+                if (data === '[DONE]') {
+                  console.log('收到结束标记');
+                  controller.close();
+                  onComplete?.();
+                  return;
+                }
+                
+                // 检查数据是否为空或无效
+                if (!data || data === '') {
+                  console.log('跳过空数据行');
+                  return;
+                }
+                
+                const parsed = JSON.parse(data);
+                console.log('解析的数据:', parsed);
+                
+                // 验证解析的数据结构
+                if (!parsed || typeof parsed !== 'object') {
+                  console.warn('解析的数据格式无效:', parsed);
+                  return;
+                }
+                
+                // 强化数据过滤逻辑 - 过滤无用信息
+                if (self.shouldFilterData(parsed)) {
+                  console.log('过滤掉无用数据:', parsed.type || parsed.content_type);
+                  return;
+                }
+                
+                // 清理内容，只保留markdown报告部分
+                const cleanedContent = parsed.content ? self.cleanMarkdownContent(parsed.content) : parsed.content;
+                
+                // 如果清理后内容为空或过短，跳过
+                if (!cleanedContent || cleanedContent.trim().length < 10) {
+                  console.log('跳过空或过短的内容');
+                  return;
+                }
+                
+                const streamResponse: CozeStreamResponse = {
+                  event: currentEvent,
+                  data: data,
+                  conversation_id: parsed.conversation_id,
+                  message_id: parsed.id,
+                  role: parsed.role,
+                  content: cleanedContent,
+                  content_type: parsed.content_type,
+                  type: parsed.type
+                };
+                
+                console.log('构造的流响应:', streamResponse);
+                controller.enqueue(streamResponse);
+                onMessage?.(streamResponse);
+              } catch (e) {
+                console.warn('解析SSE数据失败，跳过此行:', line.slice(5), e);
+                // 不中断整个流程，继续处理下一行
+              }
+            } else if (line.startsWith('event:')) {
+              currentEvent = line.slice(6).trim(); // 更新当前事件类型
+              console.log('事件类型:', currentEvent);
+            } else if (line.trim()) {
+              console.log('其他行:', line);
+            }
+          }
+
+          function processBufferedData(data: string, controller: ReadableStreamDefaultController<CozeStreamResponse>) {
+            const lines = data.split('\n');
+            for (const line of lines) {
+              if (line.trim()) {
+                processSSELine(line, controller);
+              }
+            }
           }
 
           return pump();

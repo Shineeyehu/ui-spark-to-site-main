@@ -90,6 +90,8 @@ export default function CozeStreamChat({
               </div>
             )}
             
+
+            
             {/* 加载状态 */}
             {streamState.isStreaming && !streamState.currentMessage && streamState.messages.length === 0 && (
               <div className="flex justify-center items-center py-8">

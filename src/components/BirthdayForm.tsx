@@ -27,6 +27,7 @@ interface FormData {
   birthEnvironment: string;
   age?: string;
   palmReading?: string;
+  palmReadingFile?: File;
 }
 
 const BirthdayForm = () => {
@@ -50,7 +51,8 @@ const BirthdayForm = () => {
     birthPlace: '北京市朝阳区', // 默认出生地
     birthEnvironment: '城市、平原、楼房', // 默认出生环境
     age: '20', // 默认年龄
-    palmReading: ''
+    palmReading: '',
+    palmReadingFile: undefined
   });
 
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
@@ -585,7 +587,11 @@ const BirthdayForm = () => {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    updateFormData('palmReading', file.name);
+                    setFormData(prev => ({
+                      ...prev,
+                      palmReading: file.name,
+                      palmReadingFile: file
+                    }));
                   }
                 }}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"

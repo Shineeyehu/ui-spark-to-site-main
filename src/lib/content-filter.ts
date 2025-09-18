@@ -42,6 +42,17 @@ export function extractFinalAnalysis(content: string): string {
     /\{[^}]*"type"[^}]*\}/gi,
     /\{[^}]*"plugin"[^}]*\}/gi,
     /\{[^}]*"apiId"[^}]*\}/gi,
+    // 移除RPCError和相关错误信息
+    /RPCError\{[^}]*\}/gi,
+    /PSM:\[[^\]]*\]/gi,
+    /Method:\[[^\]]*\]/gi,
+    /ErrType:\[[^\]]*\]/gi,
+    /OriginalErr:\[[^\]]*\]/gi,
+    /BizStatusCode:\[[^\]]*\]/gi,
+    /BizStatusMessage:\[[^\]]*\]/gi,
+    /run workflow failed err=/gi,
+    /请求参数不合法，详见：/gi,
+    /value '[^']*' can't convert to file/gi,
   ];
 
   let filteredContent = content;

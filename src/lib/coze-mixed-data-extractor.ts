@@ -223,14 +223,28 @@ export class CozeMixedDataExtractor {
       .replace(/\r\n/g, '\n') // 统一换行符
       .trim();
     
-    // 特殊处理：移除混合在Markdown中的JSON片段
-    cleaned = cleaned
-      .replace(/\{[^{}]*"plugin"[^{}]*\}/g, '') // 移除plugin相关JSON
-      .replace(/\{[^{}]*"八字"[^{}]*\}/g, '') // 移除八字数据JSON
-      .replace(/\{[^{}]*"紫微斗数"[^{}]*\}/g, '') // 移除紫微斗数JSON
-      .replace(/\{[^{}]*"手相分析"[^{}]*\}/g, '') // 移除手相分析JSON
-      .replace(/\{[^{}]*"arguments"[^{}]*\}/g, '') // 移除API调用JSON
-      .replace(/\{"name":"[^"]*","arguments":\{[^}]*\}\}/g, ''); // 移除完整的API调用
+    // 检查是否包含命理报告的核心内容
+    const hasReportContent = cleaned.includes('【命主信息概览】') || 
+                            cleaned.includes('核心命理分析报告') ||
+                            cleaned.includes('天赋挖掘与成长建议') ||
+                            cleaned.includes('性格特质与教养指南');
+    
+    if (hasReportContent) {
+      // 如果包含命理报告内容，只移除明显的JSON片段，保留报告内容
+      cleaned = cleaned
+        .replace(/^\{[^{}]*"plugin"[^{}]*\}$/gm, '') // 移除独立行的plugin JSON
+        .replace(/^\{[^{}]*"arguments"[^{}]*\}$/gm, '') // 移除独立行的API调用JSON
+        .replace(/^\{"name":"[^"]*","arguments":\{[^}]*\}\}$/gm, ''); // 移除独立行的完整API调用
+    } else {
+      // 如果不包含命理报告内容，使用原有的过滤逻辑
+      cleaned = cleaned
+        .replace(/\{[^{}]*"plugin"[^{}]*\}/g, '') // 移除plugin相关JSON
+        .replace(/\{[^{}]*"八字"[^{}]*\}/g, '') // 移除八字数据JSON
+        .replace(/\{[^{}]*"紫微斗数"[^{}]*\}/g, '') // 移除紫微斗数JSON
+        .replace(/\{[^{}]*"手相分析"[^{}]*\}/g, '') // 移除手相分析JSON
+        .replace(/\{[^{}]*"arguments"[^{}]*\}/g, '') // 移除API调用JSON
+        .replace(/\{"name":"[^"]*","arguments":\{[^}]*\}\}/g, ''); // 移除完整的API调用
+    }
     
     // 清理连续的空行
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n');

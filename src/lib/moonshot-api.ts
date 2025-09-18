@@ -65,15 +65,24 @@ class MoonshotAPI {
    * 验证配置
    */
   private validateConfig(): void {
-    if (!this.config.apiKey) {
+    if (!this.config.apiKey || this.config.apiKey.trim() === '') {
+      console.error('Moonshot API Key 未配置或为空');
       throw new Error('Moonshot API Key 未配置。请在环境变量中设置 VITE_MOONSHOT_API_KEY，或联系管理员配置API密钥。');
     }
-    if (!this.config.model) {
+    if (!this.config.model || this.config.model.trim() === '') {
+      console.error('Moonshot Model 未配置或为空');
       throw new Error('Moonshot Model 未配置。请在环境变量中设置 VITE_MOONSHOT_MODEL。');
     }
-    if (!this.config.baseUrl) {
+    if (!this.config.baseUrl || this.config.baseUrl.trim() === '') {
+      console.error('Moonshot Base URL 未配置或为空');
       throw new Error('Moonshot Base URL 未配置。请在环境变量中设置 VITE_MOONSHOT_BASE_URL。');
     }
+    
+    console.log('Moonshot API 配置验证通过:', {
+      hasApiKey: !!this.config.apiKey,
+      model: this.config.model,
+      baseUrl: this.config.baseUrl
+    });
   }
 
   /**
@@ -160,61 +169,78 @@ class MoonshotAPI {
     onComplete?: () => void
   ): Promise<string> {
     return this.retryRequest(async () => {
-      try {
-        const systemPrompt = await this.loadSystemPrompt();
+      const systemPrompt = await this.loadSystemPrompt();
+      console.log('开始调用Moonshot API...');
 
       const messages: MoonshotMessage[] = [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: content
-          }
-        ];
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content }
+      ];
+
+      console.log('Moonshot API 请求参数:', {
+        model: this.config.model,
+        messagesCount: messages.length,
+        baseUrl: this.config.baseUrl
+      });
 
       // 创建AbortController用于超时控制
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 增加到180秒超时
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 30000); // 30秒超时
 
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: messages,
-          temperature: 0.6,
-          max_tokens: 32768,
-          top_p: 1,
-          stream: false
-        }),
-        signal: controller.signal
-      });
+      try {
+        const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.apiKey}`
+          },
+          body: JSON.stringify({
+            model: this.config.model,
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 4000,
+            top_p: 1,
+            stream: false
+          }),
+          signal: controller.signal
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Moonshot API 错误响应:', response.status, response.statusText, errorText);
+          throw new Error(`Moonshot API 调用失败: ${response.status} ${response.statusText}. ${errorText}`);
+        }
 
-      const data: MoonshotResponse = await response.json();
-      
-      if (data.choices && data.choices.length > 0) {
-        const content = data.choices[0].message.content;
-        onComplete?.();
-        return content;
-      } else {
-        throw new Error('No content generated');
-      }
+        const data: MoonshotResponse = await response.json();
+        
+        if (data.choices && data.choices.length > 0) {
+          const result = data.choices[0].message.content;
+          console.log('Moonshot API 调用成功，返回内容长度:', result.length);
+          onMessage?.(result);
+          onComplete?.();
+          return result;
+        } else {
+          throw new Error('No content generated');
+        }
       } catch (error) {
-        // console.error('Moonshot API调用失败:', error);
-        onError?.(error as Error);
-        throw error;
-      }
+          clearTimeout(timeoutId);
+          if (error instanceof Error) {
+            if (error.name === 'AbortError') {
+              throw new Error('Moonshot流式API调用超时 (60秒)');
+            }
+            if (error.message.includes('net::ERR_ABORTED')) {
+              throw new Error('网络连接被中断，请检查网络连接或API配置');
+            }
+            if (error.message.includes('Failed to fetch')) {
+              throw new Error('无法连接到Moonshot流式API，请检查网络连接和API地址');
+            }
+          }
+          throw error;
+        }
     }, 2, 1000);
   }
 
@@ -242,39 +268,45 @@ class MoonshotAPI {
           }
         ];
 
+        console.log('开始调用Moonshot流式API...');
+
         // 创建AbortController用于超时控制
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000); // 流式请求增加到300秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 流式调用60秒超时
 
-        const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.apiKey}`
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            messages: messages,
-            temperature: 0.6,
-            max_tokens: 32768,
-            top_p: 1,
-            stream: true
-          }),
-          signal: controller.signal
-        });
+        try {
+          const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.config.apiKey}`
+            },
+            body: JSON.stringify({
+              model: this.config.model,
+              messages: messages,
+              temperature: 0.7,
+              max_tokens: 4000,
+              top_p: 1,
+              stream: true
+            }),
+            signal: controller.signal
+          });
 
-        clearTimeout(timeoutId);
+          clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Moonshot流式API错误响应:', response.status, response.statusText, errorText);
+            throw new Error(`Moonshot流式API调用失败: ${response.status} ${response.statusText}. ${errorText}`);
+          }
 
-        if (!response.body) {
-          throw new Error('Response body is null');
-        }
+          if (!response.body) {
+            throw new Error('Response body is null');
+          }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          console.log('Moonshot流式API连接成功，开始接收数据...');
 
         const stream = new ReadableStream<string>({
           start(controller) {
@@ -291,14 +323,22 @@ class MoonshotAPI {
 
                 for (const line of lines) {
                   if (line.startsWith('data: ')) {
+                    const data = line.slice(6).trim();
+                    
+                    // 处理流式传输结束标记
+                    if (data === '[DONE]') {
+                      console.log('Moonshot流式传输完成');
+                      controller.close();
+                      onComplete?.();
+                      return;
+                    }
+                    
+                    // 跳过空行
+                    if (!data) {
+                      continue;
+                    }
+                    
                     try {
-                      const data = line.slice(6);
-                      if (data === '[DONE]') {
-                        controller.close();
-                        onComplete?.();
-                        return;
-                      }
-                      
                       const parsed = JSON.parse(data);
                       if (parsed.choices && parsed.choices[0]?.delta?.content) {
                         const content = parsed.choices[0].delta.content;
@@ -306,7 +346,8 @@ class MoonshotAPI {
                         onChunk?.(content);
                       }
                     } catch (e) {
-                      // console.warn('Failed to parse SSE data:', line);
+                      console.warn('Failed to parse SSE data:', line, 'Error:', e);
+                      // 继续处理其他数据，不中断流
                     }
                   }
                 }
@@ -320,6 +361,21 @@ class MoonshotAPI {
         });
 
         return stream;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          if (error instanceof Error) {
+            if (error.name === 'AbortError') {
+              throw new Error('Moonshot流式API调用超时 (60秒)');
+            }
+            if (error.message.includes('net::ERR_ABORTED')) {
+              throw new Error('网络连接被中断，请检查网络连接或API配置');
+            }
+            if (error.message.includes('Failed to fetch')) {
+              throw new Error('无法连接到Moonshot流式API，请检查网络连接和API地址');
+            }
+          }
+          throw error;
+        }
       }, 2, 1000);
     } catch (error) {
       onError?.(error as Error);
