@@ -20,6 +20,7 @@ interface CozeV3ChatProps {
   formData?: any;
   analysisContent?: string;
   moonshotResult?: string;
+  inlineReportHtml?: string; // 新增：内联报告 HTML
   useJWT?: boolean;
   authService?: any;
 }
@@ -52,6 +53,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
   formData,
   analysisContent,
   moonshotResult,
+  inlineReportHtml,
   useJWT = false,
   authService
 }) => {
@@ -248,6 +250,17 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
           content: moonshotResult, // 直接传递HTML内容
           role: 'assistant',
           timestamp: new Date(Date.now() + 1500)
+        });
+      }
+
+      // 内联报告 iframe（若有）
+      if (inlineReportHtml) {
+        const iframeHtml = `<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body style=\"margin:0\">${inlineReportHtml}</body></html>`;
+        initialMessages.push({
+          id: 'inline-report',
+          content: iframeHtml,
+          role: 'assistant',
+          timestamp: new Date(Date.now() + 1200)
         });
       }
     } else {
@@ -989,6 +1002,14 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
                            dangerouslySetInnerHTML={{ __html: processHTMLContent(message.content) }}
                          />
                        </HTMLRenderErrorBoundary>
+                     </div>
+                   ) : message.id === 'inline-report' ? (
+                     <div className="bg-white border-2 border-amber-200 rounded-xl overflow-hidden">
+                       <iframe
+                         srcDoc={message.content}
+                         className="w-full h-[420px]"
+                         sandbox="allow-same-origin"
+                       />
                      </div>
                    ) : (
                      <div className="text-sm leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">

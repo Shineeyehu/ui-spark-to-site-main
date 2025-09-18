@@ -493,6 +493,18 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
     return stripOverviewFromHtml(html);
   }, [streamState.isStreaming, streamState.messages.length, aiAnalysisResult]);
 
+  // 供“深度咨询”内联展示的完整报告 HTML（优先 Moonshot，否则用概览+正文组合）
+  const inlineReportHtml = useMemo(() => {
+    if (moonshotState.generatedHTML) return moonshotState.generatedHTML;
+    const parts: string[] = [];
+    if (overviewHtml) parts.push(`<section class=\"mb-4\">${overviewHtml}</section>`);
+    const body = finalBodyHtml || streamingBodyHtml || aiBodyHtml;
+    if (body) parts.push(`<section>${body}</section>`);
+    if (parts.length === 0) return '';
+    // 最小 HTML 包裹，隔离在 iframe 中使用
+    return `<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body style=\"margin:0;padding:12px;background:#fffaf3;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial\">${parts.join('')}<style>body{color:#1f2937} h1,h2,h3{color:#92400e}</style></body></html>`;
+  }, [moonshotState.generatedHTML, overviewHtml, finalBodyHtml, streamingBodyHtml, aiBodyHtml]);
+
   return (
     <div className="min-h-screen relative overflow-hidden flex">
       {/* Left Half - Traditional Image */}
@@ -568,7 +580,8 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
                   state={{ 
                     formData: formData, 
                     analysisContent: analysisContent,
-                    moonshotResult: moonshotState.generatedHTML || moonshotState.streamContent
+                    moonshotResult: moonshotState.generatedHTML || moonshotState.streamContent,
+                    inlineReportHtml // 新增：用于深度咨询侧内联 iframe 展示
                   }}
                 >
                   <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
