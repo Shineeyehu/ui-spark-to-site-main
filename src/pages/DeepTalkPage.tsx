@@ -13,7 +13,7 @@ const DeepTalkPage = () => {
   const [showContent, setShowContent] = useState(false);
   
   // 从路由状态获取上下文信息
-  const { formData, analysisContent, moonshotResult } = location.state || {};
+  const { formData, analysisContent, moonshotResult, inlineReportHtml } = location.state || {};
   
   // 调试信息
   useEffect(() => {
@@ -195,6 +195,7 @@ const DeepTalkPage = () => {
                           formData={formData}
                           analysisContent={analysisContent}
                           moonshotResult={moonshotResult}
+                          inlineReportHtml={inlineReportHtml}
                           useJWT={cozeConfig.useJWT}
                           authService={cozeConfig.authService}
                         />
