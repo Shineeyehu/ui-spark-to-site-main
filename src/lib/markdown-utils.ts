@@ -65,7 +65,7 @@ export function isMarkdownFormat(text: string): boolean {
 }
 
 /**
- * 智能内容处理：自动检测格式并转换
+ * 智能内容处理：自动检测格式并转换（展示所有content数据，不过滤）
  * @param content - 内容文本
  * @returns 处理后的HTML字符串
  */
@@ -74,70 +74,63 @@ export function smartContentProcess(content: string): string {
     return "";
   }
 
+  console.log('smartContentProcess 接收到的原始内容:', content);
+
   // 如果内容已经是HTML格式（包含HTML标签），直接返回
   if (content.includes("<") && content.includes(">")) {
+    console.log('检测到HTML格式，直接返回');
     return content;
   }
 
   // 预处理内容，处理JSON格式的扣子返回数据
-  let cleanContent = content;
+  let processedContent = content;
   
   // 尝试解析JSON格式的扣子返回数据
   try {
     // 检查是否为JSON格式
     if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
       const jsonData = JSON.parse(content);
+      console.log('解析到JSON数据:', jsonData);
       
-      // 处理扣子返回的JSON数据
+      // 处理扣子返回的JSON数据，优先提取主要内容
       if (jsonData.msg_type && jsonData.data) {
-        cleanContent = jsonData.data;
+        processedContent = jsonData.data;
+        console.log('提取JSON中的data字段:', processedContent);
       } else if (jsonData.wrapped_text) {
-        cleanContent = jsonData.wrapped_text;
+        processedContent = jsonData.wrapped_text;
+        console.log('提取JSON中的wrapped_text字段:', processedContent);
       } else if (jsonData.content) {
-        cleanContent = jsonData.content;
+        processedContent = jsonData.content;
+        console.log('提取JSON中的content字段:', processedContent);
       } else {
-        // 如果是其他JSON格式，尝试提取文本内容
-        cleanContent = JSON.stringify(jsonData, null, 2);
+        // 如果是其他JSON格式，保留完整的JSON内容以便展示
+        processedContent = JSON.stringify(jsonData, null, 2);
+        console.log('保留完整JSON格式展示');
       }
     }
   } catch (error) {
     // 如果不是有效JSON，继续使用原始内容
-    console.log('非JSON格式内容，使用原始处理逻辑');
+    console.log('非JSON格式内容，使用原始内容');
+    processedContent = content;
   }
   
-  // 移除可能的JSON数据片段和特殊字符
-  cleanContent = cleanContent.replace(/@arguments.*?}}/g, '');
-  cleanContent = cleanContent.replace(/\{"status":"success".*?\}/g, '');
-  cleanContent = cleanContent.replace(/\{"msg_type":"generate_answer_finish".*?\}/g, '');
-  cleanContent = cleanContent.replace(/\\n/g, '\n'); // 处理转义的换行符
-  cleanContent = cleanContent.replace(/\\"/g, '"'); // 处理转义的引号
+  // 仅处理基本的转义字符，保留所有原始内容
+  processedContent = processedContent.replace(/\\n/g, '\n'); // 处理转义的换行符
+  processedContent = processedContent.replace(/\\"/g, '"'); // 处理转义的引号
+  processedContent = processedContent.replace(/\\t/g, '\t'); // 处理转义的制表符
   
-  // 清理重复的内容
-  const lines = cleanContent.split('\n');
-  const uniqueLines = [];
-  const seenLines = new Set();
-  
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    if (trimmedLine && !seenLines.has(trimmedLine)) {
-      seenLines.add(trimmedLine);
-      uniqueLines.push(line);
-    } else if (!trimmedLine) {
-      // 保留空行
-      uniqueLines.push(line);
-    }
-  }
-  
-  cleanContent = uniqueLines.join('\n');
+  console.log('处理转义字符后的内容:', processedContent);
 
   // 如果检测到markdown格式，进行转换并添加样式
-  if (isMarkdownFormat(cleanContent)) {
-    const html = markdownToHtml(cleanContent);
+  if (isMarkdownFormat(processedContent)) {
+    console.log('检测到Markdown格式，进行转换');
+    const html = markdownToHtml(processedContent);
     return addMarkdownStyles(html);
   }
 
-  // 否则作为纯文本处理，保留换行
-  return `<div class="whitespace-pre-wrap">${cleanContent}</div>`;
+  // 否则作为纯文本处理，保留换行和所有内容
+  console.log('作为纯文本处理');
+  return `<div class="whitespace-pre-wrap">${processedContent}</div>`;
 }
 
 /**
