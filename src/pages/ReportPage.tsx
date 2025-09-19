@@ -26,7 +26,8 @@ const ReportPage = () => {
     generateKnowledgeCard,
     generateKnowledgeCardStream,
     clearError: clearMoonshotError,
-    clearContent: clearMoonshotContent
+    clearContent: clearMoonshotContent,
+    setExternalHTML
   } = useMoonshot({
     apiKey: 'sk-MA54Wq2TSJqIPd7fOQSRpESX05JgH0nkIQ5OdAaQAb8spr7e',
     model: 'kimi-k2-0905-preview',
@@ -42,7 +43,16 @@ const ReportPage = () => {
   } = useCozeStream();
 
   // 从路由状态获取传递的数据
-  const { generatedImageUrl, formData, analysisContent, fromBirthday, startAnalysis } = location.state || {};
+  const { 
+    generatedImageUrl, 
+    formData, 
+    analysisContent, 
+    fromBirthday, 
+    startAnalysis,
+    moonshotResult,
+    inlineReportHtml: externalInlineReportHtml,
+    fromDeepTalk
+  } = location.state || {};
   
   // 调试：打印接收到的数据
   useEffect(() => {
@@ -53,6 +63,9 @@ const ReportPage = () => {
     console.log('analysisContent:', analysisContent);
     console.log('generatedImageUrl:', generatedImageUrl);
     console.log('startAnalysis:', startAnalysis);
+    console.log('moonshotResult:', moonshotResult);
+    console.log('externalInlineReportHtml:', externalInlineReportHtml);
+    console.log('fromDeepTalk:', fromDeepTalk);
     console.log('=== 调试结束 ===');
   }, []);
   
@@ -73,6 +86,18 @@ const ReportPage = () => {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // 处理从 DeepTalkPage 返回的数据：优先还原在深度咨询内联展示的完整报告 HTML
+  useEffect(() => {
+    if (!fromDeepTalk) return;
+
+    // 优先级：inlineReportHtml（完整内联报告） > moonshotResult（仅正文HTML/片段）
+    const htmlFromDeepTalk = externalInlineReportHtml || moonshotResult;
+    if (htmlFromDeepTalk) {
+      console.log('从深度咨询返回，恢复报告HTML（优先 inlineReportHtml）');
+      setExternalHTML(htmlFromDeepTalk);
+    }
+  }, [fromDeepTalk, externalInlineReportHtml, moonshotResult, setExternalHTML]);
   
   // 测试数据
   const testAnalysisContent = `您好！我是玄机子，很荣幸能为您分析孩子的命理格局。根据您提供的信息，我需要先确认几个关键点：
@@ -464,7 +489,12 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
     if (!candidate) return '';
     const overviewMd = extractOverviewSection(candidate);
     if (!overviewMd) return '';
-    return addMarkdownStyles(markdownToHtml(overviewMd));
+    // 转为 HTML 并移除其中的图片相关标签（img/figure），仅保留文本与结构
+    const html = addMarkdownStyles(markdownToHtml(overviewMd));
+    const sanitized = html
+      .replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '')
+      .replace(/<img[^>]*>/gi, '');
+    return sanitized;
   }, [streamState.currentMessage, streamState.messages.length, aiAnalysisResult]);
 
   // 生成去重/净化后的正文 HTML（不包含概览，且清理噪声）
@@ -497,12 +527,12 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
   const inlineReportHtml = useMemo(() => {
     if (moonshotState.generatedHTML) return moonshotState.generatedHTML;
     const parts: string[] = [];
-    if (overviewHtml) parts.push(`<section class=\"mb-4\">${overviewHtml}</section>`);
+    if (overviewHtml) parts.push(`<section class="mb-4">${overviewHtml}</section>`);
     const body = finalBodyHtml || streamingBodyHtml || aiBodyHtml;
     if (body) parts.push(`<section>${body}</section>`);
     if (parts.length === 0) return '';
     // 最小 HTML 包裹，隔离在 iframe 中使用
-    return `<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body style=\"margin:0;padding:12px;background:#fffaf3;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial\">${parts.join('')}<style>body{color:#1f2937} h1,h2,h3{color:#92400e}</style></body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:12px;background:#fffaf3;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial">${parts.join('')}<style>body{color:#1f2937} h1,h2,h3{color:#92400e}</style></body></html>`;
   }, [moonshotState.generatedHTML, overviewHtml, finalBodyHtml, streamingBodyHtml, aiBodyHtml]);
 
   return (
@@ -711,8 +741,8 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
                 </div>
               )}
 
-              {/* 空状态 - 显示默认图片 */}
-              {!streamState.isStreaming && streamState.messages.length === 0 && !aiAnalysisResult && !streamState.error && (
+              {/* 空状态 - 显示默认图片（当且仅当无任何已生成内容，且非深度咨询返回）*/}
+              {!streamState.isStreaming && !moonshotState.generatedHTML && streamState.messages.length === 0 && !aiAnalysisResult && !streamState.error && !fromDeepTalk && (
                 <div className="flex flex-col items-center justify-center">
                   <img 
                     src="/lovable-uploads/f705bd19-34cd-4afa-894e-12b414403c8e.png" 

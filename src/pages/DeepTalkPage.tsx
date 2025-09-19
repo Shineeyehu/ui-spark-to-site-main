@@ -145,6 +145,13 @@ const DeepTalkPage = () => {
         {/* Back Button */}
         <Link
           to="/report"
+          state={{
+            formData: formData,
+            analysisContent: analysisContent,
+            moonshotResult: moonshotResult,
+            inlineReportHtml: inlineReportHtml,
+            fromDeepTalk: true
+          }}
           className="absolute top-4 left-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors flex items-center gap-2 z-10"
         >
           <ArrowLeft className="w-5 h-5" style={{ color: '#8B4513' }} />
@@ -198,6 +205,7 @@ const DeepTalkPage = () => {
                           inlineReportHtml={inlineReportHtml}
                           useJWT={cozeConfig.useJWT}
                           authService={cozeConfig.authService}
+                          isDeepTalk={true}
                         />
                       ) : (
                         <div 

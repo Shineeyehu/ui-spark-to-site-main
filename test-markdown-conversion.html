@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown转换测试</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .original {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .converted {
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        h1, h2, h3, h4 { color: #92400e; }
+        h1 { font-size: 2rem; font-weight: bold; margin: 1.5rem 0; }
+        h2 { font-size: 1.5rem; font-weight: bold; margin: 1.25rem 0; border-bottom: 1px solid #d97706; padding-bottom: 0.5rem; }
+        h3 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0; }
+        h4 { font-size: 1rem; font-weight: 600; margin: 0.75rem 0; }
+        p { margin: 0.75rem 0; color: #374151; }
+        ul, ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+        li { margin: 0.5rem 0; color: #374151; }
+        strong { font-weight: 600; color: #92400e; }
+        hr { margin: 1.5rem 0; border: none; border-top: 1px solid #d97706; }
+    </style>
+</head>
+<body>
+    <h1>Markdown转换测试</h1>
+    
+    <div class="test-section">
+        <h2>测试1：基本标题</h2>
+        <div class="original">
+            <strong>原始Markdown:</strong><br>
+            <pre>## 【命主信息概览】
+#### 1. 性格特质与教养指南 (天性之根)
+---</pre>
+        </div>
+        <div class="converted">
+            <strong>转换后HTML:</strong><br>
+            <div id="test1"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试2：完整内容</h2>
+        <div class="original">
+            <strong>原始Markdown:</strong><br>
+            <pre id="test2-original"></pre>
+        </div>
+        <div class="converted">
+            <strong>转换后HTML:</strong><br>
+            <div id="test2"></div>
+        </div>
+    </div>
+
+    <script>
+        // 配置marked
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // 测试1：基本标题
+        const test1Markdown = `## 【命主信息概览】
+#### 1. 性格特质与教养指南 (天性之根)
+---`;
+        
+        document.getElementById('test1').innerHTML = marked.parse(test1Markdown);
+
+        // 测试2：完整内容
+        const test2Markdown = `## 【命主信息概览】
+* **性别**：男
+* **出生时间**：公历 2005年09月19日 18时
+* **四柱八字**：乙酉 乙酉 癸卯 辛酉
+* **紫微主星**：命宫[无主星]|身宫[天同(陷)+太阴(不)忌]
+* **手型**：土型手 (掌形方正,手指较短而粗壮,三大主线清晰)
+
+---##一、核心命理分析报告####1.性格特质与教养指南(天性之根)
+
+**核心天性洞察**：此子如深秋之金，外显刚毅果决，内藏聪慧机敏。如未经雕琢的璞玉，既有金属般的坚韧意志，又有水的灵动变通。手相方正厚实如沃土，显稳重踏实之性；智慧线平直深刻如刻刀，示思维缜密、规划清晰之能。
+
+**细节论证**：八字三金成势，十神杀旺印弱，紫微命宫借天机天梁禄权，成机梁善断之格。手相土形为体、金纹为用，与命理呼应，核心性格为外刚内慧,务实善谋。
+
+**教养引导建议**：对此刚毅与聪慧并存的孩子，宜用疏渠导流之法。可引导其参与策略规划的活动（如棋类、工程搭建），将杀伐之气转化为决断力。既要肯定其严谨性，又要鼓励适度变通，如雕琢玉石，既保持本质硬度，又打磨出温润光泽。
+
+####2. 潜在天赋深掘(天赋之苗)`;
+
+        document.getElementById('test2-original').textContent = test2Markdown;
+        document.getElementById('test2').innerHTML = marked.parse(test2Markdown);
+    </script>
+</body>
+</html>

@@ -23,6 +23,7 @@ interface CozeV3ChatProps {
   inlineReportHtml?: string; // 新增：内联报告 HTML
   useJWT?: boolean;
   authService?: any;
+  isDeepTalk?: boolean; // 新增：是否为深度咨询模式
 }
 
 // HTML内容处理函数
@@ -49,13 +50,14 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
   botId, 
   token, 
   userId, 
-  className = '',
-  formData,
-  analysisContent,
-  moonshotResult,
+  className = '', 
+  formData, 
+  analysisContent, 
+  moonshotResult, 
   inlineReportHtml,
-  useJWT = false,
-  authService
+  useJWT = false, 
+  authService,
+  isDeepTalk = false
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -372,13 +374,19 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       let contextInfo = '';
       if (formData) {
         contextInfo += `用户基本信息：
-- 性别：${formData.gender === 'male' ? '男' : '女'}
-- 出生时间：${formData.calendar === 'solar' ? '公历' : '农历'}${formData.birthDate} ${formData.birthTime}
-- 出生地：${formData.birthPlace}
-- 出生环境：${formData.birthEnvironment}
-- 年龄：${formData.age}岁
-
+ - 性别：${formData.gender === 'male' ? '男' : '女'}
+ - 出生时间：${formData.calendar === 'solar' ? '公历' : '农历'}${formData.birthDate} ${formData.birthTime}
+ - 出生地：${formData.birthPlace}
+ - 出生环境：${formData.birthEnvironment}
+ - 年龄：${formData.age}岁
 `;
+
+        // 深度咨询页面不传递手相相关提示
+        if (!isDeepTalk) {
+          contextInfo += `- 手相信息：${formData.palmReading ? `已上传手相图片：${formData.palmReading}，请结合命理信息进行综合分析` : '暂无手相信息'}\n\n`;
+        } else {
+          contextInfo += `\n`;
+        }
       }
       
       if (analysisContent) {
@@ -401,6 +409,70 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         contextInfo = contextInfo.substring(0, 5000) + '...\n\n[上下文信息已截断]';
       }
 
+      // 处理手相图片上传（深度咨询模式下跳过）
+      let palmImageFileId = null;
+      let uploadStatusMessage: Message | null = null;
+      
+      if (!isDeepTalk && formData && formData.palmReadingFile) {
+        try {
+          console.log('开始上传手相图片:', formData.palmReadingFile.name);
+          
+          // 添加上传状态消息
+          uploadStatusMessage = {
+            id: `upload-${Date.now()}`,
+            content: `正在上传手相图片: ${formData.palmReadingFile.name}...`,
+            role: 'assistant',
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, uploadStatusMessage]);
+          
+          // 使用 Supabase Edge Function 上传图片
+          const uploadFormData = new FormData();
+          uploadFormData.append('file', formData.palmReadingFile);
+          
+          const uploadResponse = await fetch('https://oulkicwnajomkgmffsmc.supabase.co/functions/v1/coze-upload', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91bGtpY3duYWpvbWtnbWZmc21jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMTAxMzksImV4cCI6MjA3Mjg4NjEzOX0.P-yA2o7a3rYOlo0Gyndzm1F1_710770XJ2dxq5BPoSY`
+            },
+            body: uploadFormData
+          });
+          
+          if (uploadResponse.ok) {
+            const uploadResult = await uploadResponse.json();
+            palmImageFileId = uploadResult.fileId;
+            console.log('手相图片上传成功，文件ID:', palmImageFileId);
+            
+            // 更新上传状态消息
+            if (uploadStatusMessage) {
+              setMessages(prev => prev.map(msg => 
+                msg.id === uploadStatusMessage!.id 
+                  ? { ...msg, content: '✅ 手相图片上传成功，AI 将进行专业分析' }
+                  : msg
+              ));
+            }
+          } else {
+            console.error('手相图片上传失败:', await uploadResponse.text());
+            if (uploadStatusMessage) {
+              setMessages(prev => prev.map(msg => 
+                msg.id === uploadStatusMessage!.id 
+                  ? { ...msg, content: '❌ 手相图片上传失败，将使用文本描述进行分析' }
+                  : msg
+              ));
+            }
+          }
+        } catch (error) {
+          console.error('手相图片上传异常:', error);
+          if (uploadStatusMessage) {
+            setMessages(prev => prev.map(msg => 
+              msg.id === uploadStatusMessage!.id 
+                ? { ...msg, content: '❌ 手相图片上传异常，将使用文本描述进行分析' }
+                : msg
+            ));
+          }
+        }
+      }
+
       // 构建对话历史（保留最近10条消息）
       const recentMessages = messages.slice(-10);
       const conversationHistory = recentMessages.map(msg => ({
@@ -410,22 +482,113 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         type: msg.role === 'user' ? 'question' : 'answer'
       }));
 
+      // 构建当前用户消息
+      let currentUserMessage;
+      
+      if (palmImageFileId) {
+        // 如果有手相图片，构建多模态消息
+        const multimodalContent = [
+          {
+            type: "text",
+            text: contextInfo + `用户当前问题：${inputValue}`
+          },
+          {
+            type: "image", 
+            file_id: palmImageFileId
+          }
+        ];
+        
+        currentUserMessage = {
+          content: JSON.stringify(multimodalContent),
+          content_type: "object_string",
+          role: "user" as const,
+          type: "question" as const
+        };
+        
+        console.log('构建多模态消息:', {
+          multimodalContent,
+          palmImageFileId,
+          contentType: "object_string"
+        });
+      } else {
+        // 普通文本消息
+        currentUserMessage = {
+          content: contextInfo + `用户当前问题：${inputValue}`,
+          content_type: "text",
+          role: "user" as const,
+          type: "question" as const
+        };
+      }
+
       // 添加当前用户消息
-      conversationHistory.push({
-        content: contextInfo + `用户当前问题：${inputValue}`,
-        content_type: "text",
-        role: "user",
-        type: "question"
-      });
+      conversationHistory.push(currentUserMessage);
 
       // 第一步：发送消息
-      const requestBody = {
+      const requestBody: any = {
         bot_id: botId,
         user_id: userId,
         stream: false, // 使用非流式模式
         additional_messages: conversationHistory,
         parameters: {}
       };
+
+      // 如果有手相图片，添加工作流调用
+      if (palmImageFileId) {
+        // 尝试两种方式：1. 工作流调用 2. 多模态消息
+        const hasWorkflow = true; // 可以根据配置决定是否使用工作流
+        const imageFormat: 'json' | 'string' | 'object' = 'json'; // 可选: 'json', 'string', 'object'
+        
+        if (hasWorkflow) {
+          // 方式1：使用工作流调用
+          let palmParameter;
+          
+          // 根据格式选项处理图片参数
+          if (imageFormat === 'json') {
+            palmParameter = JSON.stringify({
+              "file_id": palmImageFileId,
+              "type": "image"
+            });
+          } else if (imageFormat === 'object') {
+            palmParameter = {
+              "file_id": palmImageFileId,
+              "type": "image"
+            };
+          } else {
+            palmParameter = palmImageFileId;
+          }
+          
+          requestBody.shortcut_command = {
+            command_id: "7547965462022242314", // 手相分析工作流ID
+            parameters: {
+              "性别": formData?.gender === 'male' ? '男' : '女',
+              "出生日期": formData?.birthDate || '',
+              "公历or农历": formData?.calendar === 'solar' ? '公历' : '农历',
+              "出生时间": formData?.birthTime || '',
+              "是否为闰月": formData?.isLeapMonth === 'true' ? '是' : '否',
+              "出生地": formData?.birthPlace || '',
+              "出生环境": formData?.birthEnvironment || '',
+              "年龄": formData?.age || '',
+              "手相": palmParameter
+            }
+          };
+          requestBody.enable_card = false;
+          requestBody.publish_status = "published_online";
+          requestBody.auto_save_history = true;
+          
+          console.log('使用工作流调用手相分析:', requestBody.shortcut_command);
+          console.log('手相参数格式:', imageFormat, palmParameter);
+        } else {
+          // 方式2：在消息中明确提及图片
+          const lastMessage = conversationHistory[conversationHistory.length - 1];
+          if (lastMessage) {
+            lastMessage.content = lastMessage.content.replace(
+              /用户当前问题：.*/,
+              `用户当前问题：${inputValue}\n\n[已上传手相图片，文件ID: ${palmImageFileId}，请进行手相分析]`
+            );
+          }
+          console.log('在消息中提及手相图片:', palmImageFileId);
+        }
+      }
 
       console.log('第一步：发送扣子API消息请求:', {
         url: 'https://api.coze.cn/v3/chat',
@@ -441,7 +604,9 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         hasMoonshotResult: !!moonshotResult,
         recentMessagesCount: recentMessages.length,
         useJWT,
-        hasAuthService: !!authService
+        hasAuthService: !!authService,
+        hasPalmImage: !!palmImageFileId,
+        palmImageFileId: palmImageFileId
       });
       
       // 检查请求体大小
@@ -590,14 +755,26 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       let assistantContent = '';
       
       if (messageListData.data && messageListData.data.length > 0) {
-        // 查找助手消息，优先查找type为answer的消息
-        let assistantMessage = messageListData.data.find(msg => 
-          msg.role === 'assistant' && msg.type === 'answer'
-        );
+        // 过滤掉系统消息和知识库检索消息，只保留真正的助手回复
+        const validMessages = messageListData.data.filter(msg => {
+          if (msg.role !== 'assistant') return false;
+          
+          // 跳过系统消息类型
+          if (msg.type === 'verbose' || msg.type === 'time_capsule_recall' || msg.type === 'knowledge_recall') {
+            return false;
+          }
+          
+          return true;
+        });
         
-        // 如果没有找到answer类型，则查找任何assistant消息
+        console.log('过滤后的有效消息:', validMessages);
+        
+        // 查找助手消息，优先查找type为answer的消息
+        let assistantMessage = validMessages.find(msg => msg.type === 'answer');
+        
+        // 如果没有找到answer类型，则查找任何有效的assistant消息
         if (!assistantMessage) {
-          assistantMessage = messageListData.data.find(msg => msg.role === 'assistant');
+          assistantMessage = validMessages[0];
         }
         
         if (assistantMessage && assistantMessage.content) {
@@ -658,7 +835,9 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
               return newMessages;
             });
           }
-        } catch {}
+        } catch (error) {
+          console.log('概览提取失败:', error);
+        }
 
         setMessages(prev => {
           const newMessages = [...prev];
@@ -1005,11 +1184,11 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
                      </div>
                    ) : message.id === 'inline-report' ? (
                      <div className="bg-white border-2 border-amber-200 rounded-xl overflow-hidden">
-                       <iframe
-                         srcDoc={message.content}
-                         className="w-full h-[420px]"
-                         sandbox="allow-same-origin"
-                       />
+                      <iframe
+                        srcDoc={message.content}
+                        className="w-full h-[420px]"
+                        sandbox="allow-same-origin allow-scripts"
+                      />
                      </div>
                    ) : (
                      <div className="text-sm leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">

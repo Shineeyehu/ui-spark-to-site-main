@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown清理测试</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .original {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+        .cleaned {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+        .html-result {
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .mb-3 { margin-bottom: 0.75rem; }
+        .text-gray-700 { color: #374151; }
+        .leading-relaxed { line-height: 1.625; }
+        .text-sm { font-size: 0.875rem; }
+    </style>
+</head>
+<body>
+    <h1>Markdown清理测试</h1>
+    
+    <div class="test-section">
+        <h2>测试1：基本Markdown符号清理</h2>
+        <div class="original" id="test1-original"></div>
+        <div class="cleaned" id="test1-cleaned"></div>
+        <div class="html-result" id="test1-html"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试2：复杂Markdown内容清理</h2>
+        <div class="original" id="test2-original"></div>
+        <div class="cleaned" id="test2-cleaned"></div>
+        <div class="html-result" id="test2-html"></div>
+    </div>
+
+    <script>
+        // 清理Markdown符号的函数
+        function cleanMarkdownSymbols(text) {
+            if (!text || typeof text !== "string") {
+                return "";
+            }
+
+            let cleaned = text;
+            
+            // 清理标题符号
+            cleaned = cleaned.replace(/^#{1,6}\s*/gm, ''); // 移除行首的 # 符号
+            cleaned = cleaned.replace(/^#{1,6}\s*【[^】]+】\s*$/gm, (match) => {
+                // 保留中文标题内容，只移除 # 符号
+                return match.replace(/^#{1,6}\s*/, '');
+            });
+            
+            // 清理分隔线
+            cleaned = cleaned.replace(/^---+$/gm, ''); // 移除单独的分隔线行
+            cleaned = cleaned.replace(/^---+/gm, ''); // 移除行首的分隔线
+            
+            // 清理列表符号
+            cleaned = cleaned.replace(/^\s*[-*+]\s+/gm, ''); // 移除无序列表符号
+            cleaned = cleaned.replace(/^\s*\d+\.\s+/gm, ''); // 移除有序列表符号
+            
+            // 清理粗体和斜体符号
+            cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1'); // 移除粗体符号
+            cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1'); // 移除斜体符号
+            
+            // 清理代码符号
+            cleaned = cleaned.replace(/`([^`]+)`/g, '$1'); // 移除行内代码符号
+            cleaned = cleaned.replace(/```[\s\S]*?```/g, ''); // 移除代码块
+            
+            // 清理引用符号
+            cleaned = cleaned.replace(/^\s*>\s+/gm, ''); // 移除引用符号
+            
+            // 清理多余的空行
+            cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n'); // 将多个空行合并为两个
+            
+            return cleaned.trim();
+        }
+
+        // 转换为HTML的函数
+        function textToHtml(text) {
+            return text
+                .split('\n')
+                .map(line => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return '<br>'; // 空行转换为换行
+                    return `<p class="mb-3 text-gray-700 leading-relaxed text-sm">${trimmed}</p>`;
+                })
+                .join('');
+        }
+
+        // 测试1：基本Markdown符号清理
+        const test1Markdown = `## 【命主信息概览】
+#### 1. 性格特质与教养指南 (天性之根)
+* **性别**：男
+* **出生时间**：公历 2005年09月19日 18时
+* **四柱八字**：乙酉 乙酉 癸卯 辛酉
+---`;
+
+        document.getElementById('test1-original').textContent = test1Markdown;
+        const test1Cleaned = cleanMarkdownSymbols(test1Markdown);
+        document.getElementById('test1-cleaned').textContent = test1Cleaned;
+        document.getElementById('test1-html').innerHTML = textToHtml(test1Cleaned);
+
+        // 测试2：复杂Markdown内容清理
+        const test2Markdown = `## 【命主信息概览】
+* **性别**：男
+* **出生时间**：公历 2005年09月19日 18时
+* **四柱八字**：乙酉 乙酉 癸卯 辛酉
+* **紫微主星**：命宫[无主星]|身宫[天同(陷)+太阴(不)忌]
+* **手型**：土型手 (掌形方正,手指较短而粗壮,三大主线清晰)
+
+---##一、核心命理分析报告####1.性格特质与教养指南(天性之根)
+
+**核心天性洞察**：此子如深秋之金，外显刚毅果决，内藏聪慧机敏。如未经雕琢的璞玉，既有金属般的坚韧意志，又有水的灵动变通。手相方正厚实如沃土，显稳重踏实之性；智慧线平直深刻如刻刀，示思维缜密、规划清晰之能。
+
+**细节论证**：八字三金成势，十神杀旺印弱，紫微命宫借天机天梁禄权，成机梁善断之格。手相土形为体、金纹为用，与命理呼应，核心性格为外刚内慧,务实善谋。
+
+**教养引导建议**：对此刚毅与聪慧并存的孩子，宜用疏渠导流之法。可引导其参与策略规划的活动（如棋类、工程搭建），将杀伐之气转化为决断力。既要肯定其严谨性，又要鼓励适度变通，如雕琢玉石，既保持本质硬度，又打磨出温润光泽。
+
+####2. 潜在天赋深掘(天赋之苗)`;
+
+        document.getElementById('test2-original').textContent = test2Markdown;
+        const test2Cleaned = cleanMarkdownSymbols(test2Markdown);
+        document.getElementById('test2-cleaned').textContent = test2Cleaned;
+        document.getElementById('test2-html').innerHTML = textToHtml(test2Cleaned);
+    </script>
+</body>
+</html>

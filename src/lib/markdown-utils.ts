@@ -9,6 +9,76 @@ marked.setOptions({
 });
 
 /**
+ * 智能解析Markdown标题，处理同一行中的多个标题层级
+ * @param text - 包含Markdown符号的文本
+ * @returns 解析后的HTML字符串
+ */
+export function parseMarkdownTitles(text: string): string {
+  if (!text || typeof text !== "string") {
+    return "";
+  }
+
+  let processed = text;
+  
+  // 处理同一行中的多个标题：##一、核心命理分析报告####1.性格特质与教养指南(天性之根)
+  // 将其拆分为独立的标题行
+  processed = processed.replace(/^(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)$/gm, (match, title1, title2) => {
+    return `${title1}\n${title2}`;
+  });
+  
+  // 处理更复杂的情况：可能有多个标题在同一行
+  processed = processed.replace(/^(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)$/gm, (match, title1, title2, title3) => {
+    return `${title1}\n${title2}\n${title3}`;
+  });
+  
+  return processed;
+}
+
+/**
+ * 清理Markdown符号，转换为正常文本
+ * @param text - 包含Markdown符号的文本
+ * @returns 清理后的正常文本
+ */
+export function cleanMarkdownSymbols(text: string): string {
+  if (!text || typeof text !== "string") {
+    return "";
+  }
+
+  let cleaned = text;
+  
+  // 清理标题符号
+  cleaned = cleaned.replace(/^#{1,6}\s*/gm, ''); // 移除行首的 # 符号
+  cleaned = cleaned.replace(/^#{1,6}\s*【[^】]+】\s*$/gm, (match) => {
+    // 保留中文标题内容，只移除 # 符号
+    return match.replace(/^#{1,6}\s*/, '');
+  });
+  
+  // 清理分隔线
+  cleaned = cleaned.replace(/^---+$/gm, ''); // 移除单独的分隔线行
+  cleaned = cleaned.replace(/^---+/gm, ''); // 移除行首的分隔线
+  
+  // 清理列表符号
+  cleaned = cleaned.replace(/^\s*[-*+]\s+/gm, ''); // 移除无序列表符号
+  cleaned = cleaned.replace(/^\s*\d+\.\s+/gm, ''); // 移除有序列表符号
+  
+  // 清理粗体和斜体符号
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1'); // 移除粗体符号
+  cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1'); // 移除斜体符号
+  
+  // 清理代码符号
+  cleaned = cleaned.replace(/`([^`]+)`/g, '$1'); // 移除行内代码符号
+  cleaned = cleaned.replace(/```[\s\S]*?```/g, ''); // 移除代码块
+  
+  // 清理引用符号
+  cleaned = cleaned.replace(/^\s*>\s+/gm, ''); // 移除引用符号
+  
+  // 清理多余的空行
+  cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n'); // 将多个空行合并为两个
+  
+  return cleaned.trim();
+}
+
+/**
  * 将markdown文本转换为HTML
  * @param markdown - markdown格式的文本
  * @returns HTML字符串
@@ -41,6 +111,7 @@ export function isMarkdownFormat(text: string): boolean {
   // 检测常见的markdown标记，支持中文内容
   const markdownPatterns = [
     /^#{1,6}\s+.+/m, // 标题（支持中文）
+    /^#{1,6}\s*【[^】]+】\s*$/m, // 中文标题（如：## 【命主信息概览】）
     /\*\*[^*]+\*\*/, // 粗体
     /\*[^*]+\*/, // 斜体（但不是列表）
     /^\s*[-*+]\s+.+/m, // 无序列表
@@ -51,6 +122,10 @@ export function isMarkdownFormat(text: string): boolean {
     /\[[^\]]+\]\([^)]+\)/, // 链接
     /^---+$/m, // 分隔线
     /^\s*\*\s+\*\*[^*]+\*\*/, // 列表项中的粗体（如：* **性别**：男）
+    /^####\s+.+/m, // 四级标题
+    /^###\s+.+/m, // 三级标题
+    /^##\s+.+/m, // 二级标题
+    /^#\s+.+/m, // 一级标题
   ];
 
   // 检查是否包含多个markdown特征
@@ -120,11 +195,42 @@ export function smartContentProcess(content: string): string {
   
   console.log('处理转义字符后的内容:', processedContent);
 
-  // 如果检测到markdown格式，进行转换并添加样式
-  if (isMarkdownFormat(processedContent)) {
-    console.log('检测到Markdown格式，进行转换');
-    const html = markdownToHtml(processedContent);
-    return addMarkdownStyles(html);
+  // 检测并处理Markdown格式
+  if (isMarkdownFormat(processedContent) || 
+      processedContent.includes('####') || processedContent.includes('###') || 
+      processedContent.includes('##') || processedContent.includes('#') ||
+      processedContent.includes('---')) {
+    
+    console.log('检测到Markdown格式，使用智能解析');
+    
+    // 方法1：先智能解析标题，再转换为HTML
+    const parsedContent = parseMarkdownTitles(processedContent);
+    console.log('智能解析标题后的内容:', parsedContent);
+    
+    // 使用marked库进行标准Markdown转换
+    try {
+      const html = markdownToHtml(parsedContent);
+      console.log('Markdown转换后的HTML:', html);
+      return addMarkdownStyles(html);
+    } catch (error) {
+      console.error('Markdown转换失败，使用清理方法:', error);
+      
+      // 备用方法：清理符号后转换为段落
+      const cleanedText = cleanMarkdownSymbols(processedContent);
+      console.log('清理Markdown符号后的文本:', cleanedText);
+      
+      const html = cleanedText
+        .split('\n')
+        .map(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return '<br>'; // 空行转换为换行
+          return `<p class="mb-3 text-gray-700 leading-relaxed text-sm">${trimmed}</p>`;
+        })
+        .join('');
+      
+      console.log('清理后转换的HTML:', html);
+      return html;
+    }
   }
 
   // 否则作为纯文本处理，保留换行和所有内容
@@ -305,7 +411,7 @@ export function extractOverviewSection(raw: string): string {
  */
 export function stripOverviewFromHtml(html: string): string {
   if (!html || typeof html !== 'string') return '';
-  let content = html;
+  const content = html;
 
   // 1) 查找 <h2> 或 <h1> 中包含 "【命主信息概览】"
   const headingRegex = /<(h[12])[^>]*>\s*[^<【]*【命主信息概览】[^<]*<\/\1>/i;

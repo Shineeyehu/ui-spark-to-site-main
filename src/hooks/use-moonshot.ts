@@ -15,6 +15,7 @@ export interface UseMoonshotReturn {
   generateKnowledgeCardStream: (userContent: string) => Promise<void>;
   clearError: () => void;
   clearContent: () => void;
+  setExternalHTML: (html: string) => void;
 }
 
 export function useMoonshot(config?: Partial<MoonshotConfig>): UseMoonshotReturn {
@@ -140,11 +141,20 @@ export function useMoonshot(config?: Partial<MoonshotConfig>): UseMoonshotReturn
     }));
   }, []);
 
+  const setExternalHTML = useCallback((html: string) => {
+    setMoonshotState(prev => ({
+      ...prev,
+      generatedHTML: html,
+      error: undefined
+    }));
+  }, []);
+
   return {
     moonshotState,
     generateKnowledgeCard,
     generateKnowledgeCardStream,
     clearError,
-    clearContent
+    clearContent,
+    setExternalHTML
   };
 }
