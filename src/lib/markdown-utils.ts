@@ -182,6 +182,249 @@ export function mapErrorContent(content: string): string {
 }
 
 /**
+ * 修复混合在HTML标签中的Markdown标题
+ * 专门处理<li>标签内包含Markdown标题的复杂情况
+ * @param html - HTML字符串
+ * @returns 修复后的HTML字符串
+ */
+export function fixMixedMarkdownTitles(html: string): string {
+  if (!html || typeof html !== "string") {
+    return "";
+  }
+
+  let processed = html;
+
+  // 处理li标签内包含标题的情况
+  // 匹配模式：<li>...内容...---## 标题#### 子标题</li>
+  processed = processed.replace(
+    /<li>([^<]*(?:<[^>]+>[^<]*)*?)(---#{1,6}[^<]+)<\/li>/g,
+    (match, content, titles) => {
+      // 分离内容和标题
+      const cleanContent = content.trim();
+      const titleLines = titles.split(/(?=#{1,6})/).filter(line => line.trim());
+
+      // 构建新的HTML结构
+      let result = '';
+      if (cleanContent) {
+        result += `<li>${cleanContent}</li>`;
+      }
+
+      // 添加标题
+      titleLines.forEach(titleLine => {
+        const trimmed = titleLine.trim();
+        if (trimmed) {
+          result += `\n${trimmed}`;
+        }
+      });
+
+      return result;
+    }
+  );
+
+  // 处理li标签内包含单个标题的情况
+  // 匹配模式：<li>...内容...#### 标题</li>
+  processed = processed.replace(
+    /<li>([^<]*(?:<[^>]+>[^<]*)*?)(#{1,6}[^<]+)<\/li>/g,
+    (match, content, title) => {
+      const cleanContent = content.trim();
+      const cleanTitle = title.trim();
+
+      let result = '';
+      if (cleanContent) {
+        result += `<li>${cleanContent}</li>`;
+      }
+      if (cleanTitle) {
+        result += `\n${cleanTitle}`;
+      }
+
+      return result;
+    }
+  );
+
+  // 处理分隔线和标题的组合
+  // 匹配模式：---## 标题#### 子标题
+  processed = processed.replace(
+    /(---#{1,6}[^\n]+)/g,
+    (match) => {
+      // 将分隔线和标题分离
+      const parts = match.split(/(?=#{1,6})/);
+      let result = '';
+
+      parts.forEach(part => {
+        const trimmed = part.trim();
+        if (trimmed) {
+          if (trimmed.startsWith('---')) {
+            result += '\n---\n';
+          } else if (trimmed.startsWith('#')) {
+            result += `\n${trimmed}`;
+          }
+        }
+      });
+
+      return result;
+    }
+  );
+
+  return processed;
+}
+
+/**
+ * 增强的混合Markdown标题修复函数
+ * 专门处理复杂的li标签内混合标题情况
+ * @param html - HTML字符串
+ * @returns 修复后的HTML字符串
+ */
+export function fixComplexMixedTitles(html: string): string {
+  if (!html || typeof html !== "string") {
+    return "";
+  }
+
+  let processed = html;
+
+  // 处理li标签内混合了普通文本和多个Markdown标题的复杂情况
+  // 匹配模式：<li>...内容...## 标题#### 子标题</li>
+  processed = processed.replace(
+    /<li>([^<]*(?:<[^>]+>[^<]*)*?)(#{1,6}[^#\n]*(?:#{1,6}[^#\n]*)*)<\/li>/g,
+    (match, content, titles) => {
+      const cleanContent = content.trim();
+      
+      // 分离多个标题
+      const titleMatches = titles.match(/#{1,6}[^#\n]+/g) || [];
+      
+      let result = '';
+      
+      // 保留原始内容（如果存在）
+      if (cleanContent) {
+        result += `<li>${cleanContent}</li>`;
+      }
+      
+      // 添加分离出的标题
+      titleMatches.forEach(title => {
+        const trimmed = title.trim();
+        if (trimmed) {
+          result += `\n${trimmed}`;
+        }
+      });
+      
+      return result;
+    }
+  );
+
+  // 处理更复杂的情况：li标签内包含多个连续的标题
+  // 匹配模式：<li>...内容...## 标题#### 子标题### 另一个标题</li>
+  processed = processed.replace(
+    /<li>([^<]*(?:<[^>]+>[^<]*)*?)(#{1,6}[^<]*(?:#{1,6}[^<]*)*)<\/li>/g,
+    (match, content, titles) => {
+      const cleanContent = content.trim();
+      
+      // 使用更精确的正则表达式分离标题
+      const titlePattern = /#{1,6}[^#\n]+/g;
+      const titleMatches = titles.match(titlePattern) || [];
+      
+      let result = '';
+      
+      if (cleanContent) {
+        result += `<li>${cleanContent}</li>`;
+      }
+      
+      titleMatches.forEach(title => {
+        const trimmed = title.trim();
+        if (trimmed) {
+          result += `\n${trimmed}`;
+        }
+      });
+      
+      return result;
+    }
+  );
+
+  return processed;
+}
+
+/**
+ * AI辅助的智能文本格式转换
+ * 使用高级文本分析来处理最复杂的混合格式情况
+ * @param html - HTML字符串
+ * @returns 修复后的HTML字符串
+ */
+export function aiAssistedFormatFix(html: string): string {
+  if (!html || typeof html !== "string") {
+    return "";
+  }
+
+  let processed = html;
+
+  // 使用更智能的方法处理li标签内的复杂混合内容
+  // 这个方法会分析文本结构，识别标题模式，并正确分离
+  processed = processed.replace(
+    /<li>([^<]*(?:<[^>]+>[^<]*)*?)(#{1,6}[^<]+)<\/li>/g,
+    (match, content, titles) => {
+      const cleanContent = content.trim();
+      
+      // 分析标题部分，分离出所有可能的标题
+      const titleAnalysis = analyzeTitleStructure(titles);
+      
+      let result = '';
+      
+      // 保留原始内容（如果存在且不是空的）
+      if (cleanContent && cleanContent.length > 0) {
+        result += `<li>${cleanContent}</li>`;
+      }
+      
+      // 添加分离出的标题，按层级排序
+      titleAnalysis.forEach(title => {
+        if (title.trim()) {
+          result += `\n${title.trim()}`;
+        }
+      });
+      
+      return result;
+    }
+  );
+
+  return processed;
+}
+
+/**
+ * 分析标题结构，分离出所有标题
+ * @param titleText - 包含标题的文本
+ * @returns 分离后的标题数组
+ */
+function analyzeTitleStructure(titleText: string): string[] {
+  if (!titleText || typeof titleText !== "string") {
+    return [];
+  }
+
+  const titles: string[] = [];
+  
+  // 使用更精确的正则表达式来匹配标题
+  // 匹配模式：# 标题内容（不包含换行符）
+  const titlePattern = /#{1,6}[^#\n]+/g;
+  let match;
+  
+  while ((match = titlePattern.exec(titleText)) !== null) {
+    const title = match[0].trim();
+    if (title) {
+      titles.push(title);
+    }
+  }
+  
+  // 如果没有找到标准格式的标题，尝试其他模式
+  if (titles.length === 0) {
+    // 尝试匹配没有空格的标题格式：##标题
+    const noSpacePattern = /#{1,6}[^#\n\s]+/g;
+    while ((match = noSpacePattern.exec(titleText)) !== null) {
+      const title = match[0].trim();
+      if (title) {
+        titles.push(title);
+      }
+    }
+  }
+  
+  return titles;
+}
+
+/**
  * 智能内容处理：自动检测格式并转换（展示所有content数据，不过滤）
  * @param content - 内容文本
  * @returns 处理后的HTML字符串
@@ -260,7 +503,20 @@ export function smartContentProcess(content: string): string {
     try {
       const html = markdownToHtml(parsedContent);
       console.log('Markdown转换后的HTML:', html);
-      return addMarkdownStyles(html);
+
+      // 修复混合在HTML标签中的Markdown标题
+      const fixedHtml = fixMixedMarkdownTitles(html);
+      console.log('修复混合标题后的HTML:', fixedHtml);
+
+      // 进一步修复复杂的混合标题情况
+      const complexFixedHtml = fixComplexMixedTitles(fixedHtml);
+      console.log('修复复杂混合标题后的HTML:', complexFixedHtml);
+
+      // 使用AI辅助的智能格式修复处理最复杂的情况
+      const aiFixedHtml = aiAssistedFormatFix(complexFixedHtml);
+      console.log('AI辅助修复后的HTML:', aiFixedHtml);
+
+      return addMarkdownStyles(aiFixedHtml);
     } catch (error) {
       console.error('Markdown转换失败，使用清理方法:', error);
       
