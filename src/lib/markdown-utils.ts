@@ -139,6 +139,49 @@ export function isMarkdownFormat(text: string): boolean {
 }
 
 /**
+ * 错误内容映射：将技术性错误信息映射为用户友好的提示
+ * @param content - 原始内容
+ * @returns 映射后的内容
+ */
+export function mapErrorContent(content: string): string {
+  if (!content || typeof content !== "string") {
+    return content;
+  }
+
+  // 手相识别失败的错误映射
+  const errorMappings = [
+    {
+      // 匹配包含手相相关错误信息的内容
+      pattern: /您好，目前无法获取手相照片信息，可能是文件ID有误或系统暂时无法读取。为了更精准地完成"天地双盘\+手相，参合互证"的深度分析，能否请您重新确认或提供有效的手相照片信息？\s*重新提供一下手相照片的文件\s*ID。\s*不考虑手相的话，能否对孩子进行命理分析？\s*除了手相和天地双盘，还有哪些命理分析方法？/,
+      replacement: "暂时无法获取手相信息，请您点击刷新后重试！"
+    },
+    {
+      // 匹配手相分析功能需要具体特征描述的错误
+      pattern: /您好，目前手相分析功能需要您提供手相的具体特征描述（如掌形、纹路特点等），而非文件ID。请您帮忙描述一下孩子手相的特征，比如掌形是方形、细长形还是其他形状？三大主纹（生命线、智慧线、感情线）是否清晰深刻？是否有特殊纹路或标记？这样我才能结合八字和紫微斗数为您进行全面的"天地双盘\+手相"分析。\s*请描述一下这个孩子的掌形和手指形状。\s*这个孩子的手相上有哪些特殊的纹路或标记？\s*他的智慧线和感情线有什么特点？/,
+      replacement: "暂时无法获取手相信息，请您点击刷新后重试！"
+    },
+    {
+      // 匹配其他手相相关的错误信息
+      pattern: /无法获取手相照片信息|文件ID有误|系统暂时无法读取.*手相|手相分析功能需要您提供手相的具体特征描述/,
+      replacement: "暂时无法获取手相信息，请您点击刷新后重试！"
+    }
+  ];
+
+  let mappedContent = content;
+  
+  // 应用错误映射
+  for (const mapping of errorMappings) {
+    if (mapping.pattern.test(mappedContent)) {
+      console.log('检测到手相错误信息，进行映射:', mapping.pattern);
+      mappedContent = mappedContent.replace(mapping.pattern, mapping.replacement);
+      break; // 只应用第一个匹配的映射
+    }
+  }
+
+  return mappedContent;
+}
+
+/**
  * 智能内容处理：自动检测格式并转换（展示所有content数据，不过滤）
  * @param content - 内容文本
  * @returns 处理后的HTML字符串
@@ -150,20 +193,26 @@ export function smartContentProcess(content: string): string {
 
   console.log('smartContentProcess 接收到的原始内容:', content);
 
+  // 首先进行错误内容映射
+  const errorMappedContent = mapErrorContent(content);
+  if (errorMappedContent !== content) {
+    console.log('错误内容映射完成:', errorMappedContent);
+  }
+
   // 如果内容已经是HTML格式（包含HTML标签），直接返回
-  if (content.includes("<") && content.includes(">")) {
+  if (errorMappedContent.includes("<") && errorMappedContent.includes(">")) {
     console.log('检测到HTML格式，直接返回');
-    return content;
+    return errorMappedContent;
   }
 
   // 预处理内容，处理JSON格式的扣子返回数据
-  let processedContent = content;
+  let processedContent = errorMappedContent;
   
   // 尝试解析JSON格式的扣子返回数据
   try {
     // 检查是否为JSON格式
-    if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
-      const jsonData = JSON.parse(content);
+    if (errorMappedContent.trim().startsWith('{') && errorMappedContent.trim().endsWith('}')) {
+      const jsonData = JSON.parse(errorMappedContent);
       console.log('解析到JSON数据:', jsonData);
       
       // 处理扣子返回的JSON数据，优先提取主要内容
