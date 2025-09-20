@@ -170,7 +170,7 @@ const ReportPage = () => {
 
 ---`;
 
-  // 生成分析内容 - 现在调用扣子智能体
+  // 生成分析内容 - 现在调用智能体
   const generateAnalysisContent = async () => {
     console.log('=== generateAnalysisContent 开始 ===');
     console.log('formData:', formData);
@@ -197,13 +197,13 @@ const ReportPage = () => {
     console.log('转换后的 birthInfo:', birthInfo);
 
     try {
-      // 调用扣子智能体进行分析
+      // 调用智能体进行分析
       console.log('调用 startBirthAnalysis...');
       await startBirthAnalysis(birthInfo);
       console.log('startBirthAnalysis 调用完成');
       
       // 返回初始提示信息
-      const initialMessage = `正在调用扣子智能体进行专业命理分析...
+      const initialMessage = `正在调用智能体进行专业命理分析...
 
 根据您提供的信息：
 - 性别：${formData.gender === 'male' ? '男孩' : '女孩'}
@@ -218,8 +218,8 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
       console.log('返回初始消息:', initialMessage);
       return initialMessage;
     } catch (error) {
-      console.error('调用扣子智能体失败:', error);
-      const errorMessage = `调用扣子智能体时出现错误：${error instanceof Error ? error.message : '未知错误'}`;
+      console.error('调用智能体失败:', error);
+      const errorMessage = `调用智能体时出现错误：${error instanceof Error ? error.message : '未知错误'}`;
       console.log('返回错误消息:', errorMessage);
       return errorMessage;
     }
@@ -292,7 +292,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
   useEffect(() => {
     if (streamState.isStreaming) {
       const timeoutTimer = setTimeout(() => {
-        setAiAnalysisResult('分析超时：扣子智能体响应时间过长，请稍后重试。可能的原因：网络连接问题、API服务繁忙或token配置错误。');
+        setAiAnalysisResult('分析超时：智能体响应时间过长，请稍后重试。可能的原因：网络连接问题、API服务繁忙或token配置错误。');
         // 停止流式处理
         stopStream();
         setIsAnalyzing(false);
@@ -306,7 +306,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
   useEffect(() => {
     // 处理错误
     if (streamState.error) {
-      setAiAnalysisResult(`扣子智能体分析出错：${streamState.error}`);
+      setAiAnalysisResult(`智能体分析出错：${streamState.error}`);
       setIsAnalyzing(false);
       return;
     }
@@ -325,7 +325,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
       const timeoutId = setTimeout(() => {
         setAiAnalysisResult(prev => {
           // 如果是初始提示信息，替换为流式内容
-          if (prev.includes('正在调用扣子智能体进行专业命理分析')) {
+          if (prev.includes('正在调用智能体进行专业命理分析')) {
             return streamState.currentMessage;
           }
           return streamState.currentMessage;
@@ -336,7 +336,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
     }
   }, [streamState.error, streamState.isStreaming, streamState.messages.length, streamState.currentMessage]);
 
-  // 开始AI分析 - 使用扣子智能体
+  // 开始AI分析 - 使用智能体
   const handleStartAIAnalysis = async () => {
     console.log('=== 开始AI分析 ===');
     console.log('formData:', formData);
@@ -346,7 +346,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
     setShowAIImage(true);
     
     try {
-      // 调用扣子智能体进行分析
+      // 调用智能体进行分析
       console.log('调用 generateAnalysisContent...');
       const initialContent = await generateAnalysisContent();
       console.log('generateAnalysisContent 返回:', initialContent);
@@ -437,14 +437,14 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
     }
   };
 
-  // 生成 AI 知识卡 - 使用扣子智能体 + Moonshot API
+  // 生成 AI 知识卡 - 使用智能体 + Moonshot API
   const handleGenerateKnowledgeCard = async () => {
     try {
       setIsAnalyzing(true);
       setShowAIImage(true);
       clearMessages(); // 清除之前的消息
       
-      // 第一步：调用扣子智能体生成分析内容
+      // 第一步：调用智能体生成分析内容
       const initialContent = await generateAnalysisContent();
       setAiAnalysisResult(initialContent);
       
@@ -570,7 +570,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                    <span className="text-blue-800 font-medium">扣子智能体正在基于知识库为您深度分析...</span>
+                    <span className="text-blue-800 font-medium">智能体正在基于知识库为您深度分析...</span>
                   </div>
                   <p className="text-sm text-blue-600">请稍等一盏茶的工夫</p>
                 </div>
@@ -650,7 +650,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
                   <div className="flex items-center gap-3 mb-4">
                     <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
                     <span className="text-lg font-medium text-blue-800">
-                      扣子智能体正在基于知识库生成知识卡...
+                      智能体正在基于知识库生成知识卡...
                     </span>
                   </div>
                   <p className="text-sm text-blue-600">请稍候片刻</p>
@@ -689,7 +689,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
               {streamState.isStreaming && streamState.currentMessage && (
                 <div className="mb-6">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="text-sm font-medium text-blue-800 mb-2">扣子智能体正在生成中...</h3>
+                    <h3 className="text-sm font-medium text-blue-800 mb-2">智能体正在生成中...</h3>
                     <div className="h-32 overflow-y-auto">
                       <div className="text-xs text-blue-700 whitespace-pre-wrap font-mono">
                         {streamState.currentMessage}

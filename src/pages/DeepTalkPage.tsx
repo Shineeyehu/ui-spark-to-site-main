@@ -221,12 +221,6 @@ const DeepTalkPage = () => {
                   </CardContent>
                 </Card>
 
-                {/* Footer Info */}
-                <div className="text-center mt-4">
-                  <p style={{ color: '#A0522D' }} className="text-xs">
-                    国学智慧 × 扣子AI = 智能命理咨询
-                  </p>
-                </div>
               </>
             )}
           </div>
