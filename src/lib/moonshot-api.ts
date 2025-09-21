@@ -58,13 +58,31 @@ class MoonshotAPI {
 
   constructor(config: MoonshotConfig) {
     this.config = config;
-    this.validateConfig();
+    
+    // 只在生产环境验证配置，开发环境提供降级处理
+    if (import.meta.env.PROD) {
+      this.validateConfig();
+    } else {
+      console.warn('开发环境：跳过Moonshot API配置验证');
+      if (!this.config.apiKey || this.config.apiKey.trim() === '') {
+        console.warn('开发环境：Moonshot API Key 未配置，某些功能可能不可用');
+      }
+    }
   }
 
   /**
    * 验证配置
    */
   private validateConfig(): void {
+    console.log('=== Moonshot API 配置调试 ===');
+    console.log('环境变量 VITE_MOONSHOT_API_KEY:', import.meta.env.VITE_MOONSHOT_API_KEY);
+    console.log('环境变量 VITE_MOONSHOT_MODEL:', import.meta.env.VITE_MOONSHOT_MODEL);
+    console.log('环境变量 VITE_MOONSHOT_BASE_URL:', import.meta.env.VITE_MOONSHOT_BASE_URL);
+    console.log('this.config.apiKey:', this.config.apiKey);
+    console.log('this.config.model:', this.config.model);
+    console.log('this.config.baseUrl:', this.config.baseUrl);
+    console.log('=== 调试结束 ===');
+    
     if (!this.config.apiKey || this.config.apiKey.trim() === '') {
       console.error('Moonshot API Key 未配置或为空');
       throw new Error('Moonshot API Key 未配置。请在环境变量中设置 VITE_MOONSHOT_API_KEY，或联系管理员配置API密钥。');
