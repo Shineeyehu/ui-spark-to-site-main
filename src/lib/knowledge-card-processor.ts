@@ -217,6 +217,8 @@ function extractOverviewData(content: string) {
     let handType = handTypeMatch[1].trim();
     // 移除分隔线和后续的标题内容
     handType = handType.replace(/---.*$/, '').trim();
+    // 进一步清理，移除可能连在一起的Markdown标题
+    handType = handType.replace(/#{1,6}\s*[^\n]*$/, '').trim();
     overview.handType = handType;
   }
 
@@ -454,6 +456,11 @@ function preprocessMarkdown(markdown: string): string {
     return match;
   });
   
+  // 处理手型字段后直接连Markdown标题的情况
+  // 例如：手型：待补充（需手相照片分析）## 一、 核心命理分析报告#### 1. 性格特质与教养指南
+  processed = processed.replace(/(手型[：:][^#\n]*?)(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, '$1\n$2\n$3');
+  processed = processed.replace(/(手型[：:][^#\n]*?)(#{1,6}[^#\n]+)/g, '$1\n$2');
+  
   // 处理标题后面直接跟内容的情况
   // 例如：### 1. 儿童篆刻趣味启蒙班（首选）根据命盘特质
   processed = processed.replace(/^(#{1,6}\s*[^\n]+)([^#\n]{10,})/gm, (match, title, content) => {
@@ -562,6 +569,11 @@ function processMarkdownTitles(content: string): string {
   processed = processed.replace(/(---)(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, '$1\n$2\n$3');
   processed = processed.replace(/(---)(#{1,6}[^#\n]+)/g, '$1\n$2');
   processed = processed.replace(/(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, '$1\n$2');
+  
+  // 处理手型字段后直接连Markdown标题的情况
+  // 例如：手型：待补充（需手相照片分析）## 一、 核心命理分析报告#### 1. 性格特质与教养指南
+  processed = processed.replace(/(手型[：:][^#\n]*?)(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, '$1\n$2\n$3');
+  processed = processed.replace(/(手型[：:][^#\n]*?)(#{1,6}[^#\n]+)/g, '$1\n$2');
 
   // 处理特殊的标题格式
   // 处理 "---### 二、 天赋挖掘与成长建议" 格式
