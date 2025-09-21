@@ -1,0 +1,61 @@
+{
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "VITE_MOONSHOT_API_KEY",
+        "value": "sk-your-moonshot-api-key-here",
+        "description": "Moonshot API密钥，从 https://platform.moonshot.cn/ 获取",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_API_TOKEN",
+        "value": "your-coze-access-token-here",
+        "description": "扣子API访问令牌，从 https://www.coze.cn/ 获取",
+        "environments": ["Production", "Preview", "Development"]
+      }
+    ],
+    "optional": [
+      {
+        "name": "VITE_MOONSHOT_MODEL",
+        "value": "kimi-k2-0905-preview",
+        "description": "Moonshot模型名称",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_MOONSHOT_BASE_URL",
+        "value": "https://api.moonshot.cn/v1",
+        "description": "Moonshot API基础URL",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_BOT_ID",
+        "value": "7546564367413379135",
+        "description": "扣子智能体ID",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_USE_JWT",
+        "value": "false",
+        "description": "是否使用JWT认证",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_USER_ID",
+        "value": "user_123",
+        "description": "用户ID",
+        "environments": ["Production", "Preview", "Development"]
+      }
+    ]
+  },
+  "steps": [
+    "1. 登录 Vercel 控制台：https://vercel.com/dashboard",
+    "2. 选择项目：ui-spark-to-site-main",
+    "3. 进入 Settings → Environment Variables",
+    "4. 添加必需的环境变量（VITE_MOONSHOT_API_KEY 和 VITE_COZE_API_TOKEN）",
+    "5. 添加可选的环境变量（推荐全部添加）",
+    "6. 确保所有环境变量都勾选了所有环境",
+    "7. 保存并重新部署项目"
+  ],
+  "currentError": "Moonshot API Key 未配置或为空",
+  "solution": "设置 VITE_MOONSHOT_API_KEY 环境变量"
+}
