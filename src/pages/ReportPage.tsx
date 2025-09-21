@@ -9,6 +9,7 @@ import { useMoonshot } from '@/hooks/use-moonshot';
 import { useCozeStream } from '@/hooks/use-coze-stream';
 import { smartContentProcess, addMarkdownStyles, markdownToHtml, extractOverviewSection, cleanCozeNoise, stripOverviewFromHtml } from '@/lib/markdown-utils';
 import { generateKnowledgeCardHTML, extractKnowledgeCardData, generateOverviewHTML, generateRemainingContentHTML } from '@/lib/knowledge-card-processor';
+import { logEnvironmentStatus } from '@/utils/env-checker';
 import type { BirthInfo } from '@/lib/coze-api';
 
 const ReportPage = () => {
@@ -30,7 +31,7 @@ const ReportPage = () => {
     clearContent: clearMoonshotContent,
     setExternalHTML
   } = useMoonshot({
-    apiKey: import.meta.env.VITE_MOONSHOT_API_KEY || '',
+    apiKey: import.meta.env.VITE_MOONSHOT_API_KEY || 'sk-MA54Wq2TSJqIPd7fOQSRpESX05JgH0nkIQ5OdAaQAb8spr7e',
     model: import.meta.env.VITE_MOONSHOT_MODEL || 'kimi-k2-0905-preview',
     baseUrl: import.meta.env.VITE_MOONSHOT_BASE_URL || 'https://api.moonshot.cn/v1'
   });
@@ -55,7 +56,7 @@ const ReportPage = () => {
     fromDeepTalk
   } = location.state || {};
   
-  // 调试：打印接收到的数据
+  // 调试：打印接收到的数据和环境变量状态
   useEffect(() => {
     console.log('=== ReportPage 数据接收调试 ===');
     console.log('location.state:', location.state);
@@ -68,6 +69,9 @@ const ReportPage = () => {
     console.log('externalInlineReportHtml:', externalInlineReportHtml);
     console.log('fromDeepTalk:', fromDeepTalk);
     console.log('=== 调试结束 ===');
+    
+    // 检查环境变量状态
+    logEnvironmentStatus();
   }, []);
 
   // 检查是否有有效数据

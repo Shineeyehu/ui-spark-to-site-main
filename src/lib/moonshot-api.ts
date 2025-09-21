@@ -48,7 +48,7 @@ export interface MoonshotStreamResponse {
 
 // 默认配置
 export const defaultMoonshotConfig: MoonshotConfig = {
-  apiKey: import.meta.env.VITE_MOONSHOT_API_KEY || '',
+  apiKey: import.meta.env.VITE_MOONSHOT_API_KEY || 'sk-MA54Wq2TSJqIPd7fOQSRpESX05JgH0nkIQ5OdAaQAb8spr7e',
   model: import.meta.env.VITE_MOONSHOT_MODEL || 'kimi-k2-0905-preview',
   baseUrl: import.meta.env.VITE_MOONSHOT_BASE_URL || 'https://api.moonshot.cn/v1'
 };
