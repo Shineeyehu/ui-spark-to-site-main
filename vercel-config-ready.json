@@ -1,0 +1,77 @@
+{
+  "vercel_environment_variables": {
+    "required": [
+      {
+        "name": "VITE_MOONSHOT_API_KEY",
+        "value": "sk-MA54Wq2TSJqIPd7fOQSRpESX05JgH0nkIQ5OdAaQAb8spr7e",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_API_TOKEN",
+        "value": "pat_WJDhe5pLrsGYOyNuzTDJIQMuf3lSv5R6R0vjbb9qA448GceGAzzcRJCqz1cEzMlS",
+        "environments": ["Production", "Preview", "Development"]
+      }
+    ],
+    "recommended": [
+      {
+        "name": "VITE_MOONSHOT_MODEL",
+        "value": "kimi-k2-0905-preview",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_MOONSHOT_BASE_URL",
+        "value": "https://api.moonshot.cn/v1",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_BOT_ID",
+        "value": "7546564367413379135",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_USE_JWT",
+        "value": "false",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_USER_ID",
+        "value": "user_123",
+        "environments": ["Production", "Preview", "Development"]
+      }
+    ],
+    "oauth": [
+      {
+        "name": "VITE_COZE_CLIENT_ID",
+        "value": "08461612714393126791235695948705.app.coze",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_CLIENT_SECRET",
+        "value": "6JdTe15fTYT2a6FLcZeZWCFbj0ashyGVAA4NiIxz4VrQBxFA",
+        "environments": ["Production", "Preview", "Development"]
+      },
+      {
+        "name": "VITE_COZE_REDIRECT_URI",
+        "value": "https://your-vercel-domain.vercel.app/oauth/callback",
+        "note": "需要替换为实际的Vercel域名",
+        "environments": ["Production", "Preview", "Development"]
+      }
+    ]
+  },
+  "setup_instructions": {
+    "step1": "登录 Vercel 控制台：https://vercel.com/dashboard",
+    "step2": "选择项目：ui-spark-to-site-main",
+    "step3": "进入 Settings → Environment Variables",
+    "step4": "添加上述所有环境变量",
+    "step5": "确保所有变量都勾选了所有环境",
+    "step6": "保存并重新部署项目"
+  },
+  "found_locations": {
+    "moonshot_key": "文档文件中（VERCEL_REPORT_FIX.md等）",
+    "coze_token": "test-coze-api.js",
+    "coze_bot_id": "test-coze-api.js",
+    "oauth_config": "src/lib/jwt-auth.ts"
+  },
+  "current_error": "Moonshot API Key 未配置或为空",
+  "solution": "设置所有必需的环境变量并重新部署"
+}

@@ -69,6 +69,30 @@ const ReportPage = () => {
     console.log('fromDeepTalk:', fromDeepTalk);
     console.log('=== 调试结束 ===');
   }, []);
+
+  // 检查是否有有效数据
+  const hasValidData = useMemo(() => {
+    return !!(
+      formData || 
+      analysisContent || 
+      moonshotResult || 
+      externalInlineReportHtml ||
+      streamState.messages.length > 0 ||
+      aiAnalysisResult ||
+      moonshotState.generatedHTML
+    );
+  }, [formData, analysisContent, moonshotResult, externalInlineReportHtml, streamState.messages.length, aiAnalysisResult, moonshotState.generatedHTML]);
+
+  // 如果没有数据且不是从其他页面跳转，自动重定向到生日页面
+  useEffect(() => {
+    if (!hasValidData && !fromBirthday && !fromDeepTalk) {
+      console.log('ReportPage: 没有有效数据，3秒后自动跳转到生日页面');
+      const timer = setTimeout(() => {
+        window.location.href = '/birthday';
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [hasValidData, fromBirthday, fromDeepTalk]);
   
   // 5秒后自动关闭分析提示
   useEffect(() => {
@@ -654,8 +678,43 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
               )}
 
 
+              {/* 无数据状态 - 显示引导信息 */}
+              {!hasValidData && !streamState.isStreaming && !streamState.error && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="text-center max-w-lg mx-auto">
+                    <div className="mb-6">
+                      <img 
+                        src="/lovable-uploads/f705bd19-34cd-4afa-894e-12b414403c8e.png" 
+                        alt="命理分析报告"
+                        className="w-full max-w-md mx-auto rounded-lg shadow-lg"
+                      />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">欢迎来到命理分析报告</h3>
+                    <p className="text-gray-600 mb-6">
+                      请先填写出生信息，系统将为您生成个性化的命理分析报告
+                    </p>
+                    <div className="space-y-3">
+                      <Link 
+                        to="/birthday"
+                        className="inline-block bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                      >
+                        开始分析
+                      </Link>
+                      <div className="text-sm text-gray-500">
+                        或使用深度咨询功能获得更详细的分析
+                      </div>
+                      {!fromBirthday && !fromDeepTalk && (
+                        <div className="mt-4 text-xs text-gray-400">
+                          3秒后自动跳转到分析页面...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* 空状态 - 显示默认图片（当且仅当无任何已生成内容，且非深度咨询返回）*/}
-              {!streamState.isStreaming && !moonshotState.generatedHTML && streamState.messages.length === 0 && !aiAnalysisResult && !streamState.error && !fromDeepTalk && (
+              {!streamState.isStreaming && !moonshotState.generatedHTML && streamState.messages.length === 0 && !aiAnalysisResult && !streamState.error && !fromDeepTalk && hasValidData && (
                 <div className="flex flex-col items-center justify-center">
                   <img 
                     src="/lovable-uploads/f705bd19-34cd-4afa-894e-12b414403c8e.png" 
