@@ -425,6 +425,281 @@ function analyzeTitleStructure(titleText: string): string[] {
 }
 
 /**
+ * 通用Markdown标题转换函数
+ * 将任何Markdown格式的标题转换为对应的HTML标题
+ * @param content - 包含Markdown标题的内容
+ * @returns 转换后的HTML字符串
+ */
+export function convertMarkdownTitlesToHtml(content: string): string {
+  if (!content || typeof content !== "string") {
+    return "";
+  }
+
+  let processed = content;
+
+  // 处理各种级别的Markdown标题
+  // H1标题
+  processed = processed.replace(/^#\s+(.+)$/gm, '<h1 class="text-2xl font-bold text-amber-900 mb-4 mt-6 first:mt-0 tracking-wide">$1</h1>');
+  
+  // H2标题
+  processed = processed.replace(/^##\s+(.+)$/gm, '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide">$1</h2>');
+  
+  // H3标题
+  processed = processed.replace(/^###\s+(.+)$/gm, '<h3 class="text-lg font-semibold text-amber-800 mb-2 mt-4 first:mt-0 tracking-wide">$1</h3>');
+  
+  // H4标题
+  processed = processed.replace(/^####\s+(.+)$/gm, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">$1</h4>');
+  
+  // H5标题
+  processed = processed.replace(/^#####\s+(.+)$/gm, '<h5 class="text-sm font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">$1</h5>');
+  
+  // H6标题
+  processed = processed.replace(/^######\s+(.+)$/gm, '<h6 class="text-xs font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">$1</h6>');
+
+  return processed;
+}
+
+/**
+ * 增强的Markdown标题处理函数
+ * 能够处理混合在同一行中的多个标题
+ * @param content - 包含Markdown标题的内容
+ * @returns 转换后的HTML字符串
+ */
+export function processMixedMarkdownTitles(content: string): string {
+  if (!content || typeof content !== "string") {
+    return "";
+  }
+
+  let processed = content;
+
+  // 首先检查是否真的存在混合标题（同一行中有多个标题）
+  // 如果内容已经正确换行，直接使用标准转换
+  const hasMixedTitles = /#{1,6}[^#\n]+#{1,6}[^#\n]+/.test(processed);
+  
+  if (!hasMixedTitles) {
+    // 没有混合标题，直接使用标准Markdown转换
+    return convertMarkdownTitlesToHtml(processed);
+  }
+
+  // 只有在确实存在混合标题时才进行特殊处理
+  console.log('检测到混合标题，进行特殊处理');
+
+  // 处理分隔符+标题的混合情况
+  // 例如：---## 一、核心命理分析报告### 1. 性格特质与教养指南 (天性之根)
+  processed = processed.replace(/(---\s*)(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, (match, separator, title1, title2) => {
+    const h1Level = (title1.match(/#/g) || []).length;
+    const h2Level = (title2.match(/#/g) || []).length;
+    
+    const h1Html = convertSingleTitle(title1, h1Level);
+    const h2Html = convertSingleTitle(title2, h2Level);
+    
+    return `${separator}\n${h1Html}\n${h2Html}`;
+  });
+
+  // 处理分隔符+单个标题的情况
+  // 例如：---## 一、核心命理分析报告
+  processed = processed.replace(/(---\s*)(#{1,6}[^#\n]+)/g, (match, separator, title) => {
+    const level = (title.match(/#/g) || []).length;
+    const titleHtml = convertSingleTitle(title, level);
+    
+    return `${separator}\n${titleHtml}`;
+  });
+
+  // 处理行内混合标题的情况
+  // 例如：内容##一、核心命理分析报告###1.性格特质与教养指南(天性之根)
+  processed = processed.replace(/([^#\n])(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, (match, prefix, title1, title2) => {
+    const h1Level = (title1.match(/#/g) || []).length;
+    const h2Level = (title2.match(/#/g) || []).length;
+    
+    const h1Html = convertSingleTitle(title1, h1Level);
+    const h2Html = convertSingleTitle(title2, h2Level);
+    
+    return `${prefix}\n${h1Html}\n${h2Html}`;
+  });
+
+  // 处理行首混合标题的情况
+  // 例如：##一、核心命理分析报告###1.性格特质与教养指南(天性之根)
+  processed = processed.replace(/^(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/gm, (match, title1, title2) => {
+    const h1Level = (title1.match(/#/g) || []).length;
+    const h2Level = (title2.match(/#/g) || []).length;
+    
+    const h1Html = convertSingleTitle(title1, h1Level);
+    const h2Html = convertSingleTitle(title2, h2Level);
+    
+    return `${h1Html}\n${h2Html}`;
+  });
+
+  // 处理三个标题在同一行的情况
+  processed = processed.replace(/(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, (match, title1, title2, title3) => {
+    const h1Level = (title1.match(/#/g) || []).length;
+    const h2Level = (title2.match(/#/g) || []).length;
+    const h3Level = (title3.match(/#/g) || []).length;
+    
+    const h1Html = convertSingleTitle(title1, h1Level);
+    const h2Html = convertSingleTitle(title2, h2Level);
+    const h3Html = convertSingleTitle(title3, h3Level);
+    
+    return `${h1Html}\n${h2Html}\n${h3Html}`;
+  });
+
+  // 处理剩余的单个标题
+  processed = convertMarkdownTitlesToHtml(processed);
+
+  return processed;
+}
+
+/**
+ * 转换单个标题为HTML
+ * @param title - 标题文本
+ * @param level - 标题级别
+ * @returns HTML字符串
+ */
+function convertSingleTitle(title: string, level: number): string {
+  const cleanTitle = title.replace(/^#+\s*/, '').trim();
+  
+  const classMap = {
+    1: 'text-2xl font-bold text-amber-900 mb-4 mt-6 first:mt-0 tracking-wide',
+    2: 'text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide',
+    3: 'text-lg font-semibold text-amber-800 mb-2 mt-4 first:mt-0 tracking-wide',
+    4: 'text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide',
+    5: 'text-sm font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide',
+    6: 'text-xs font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide'
+  };
+  
+  const className = classMap[level as keyof typeof classMap] || classMap[4];
+  
+  return `<h${level} class="${className}">${cleanTitle}</h${level}>`;
+}
+
+/**
+ * 专门处理知识卡输出格式的Markdown标题转换
+ * 根据outputformat.md的格式规范，将特定格式的标题转换为正确的HTML
+ * @param content - 包含知识卡格式的内容
+ * @returns 转换后的HTML字符串
+ */
+export function processKnowledgeCardFormat(content: string): string {
+  if (!content || typeof content !== "string") {
+    return "";
+  }
+
+  console.log('processKnowledgeCardFormat 处理内容:', content.substring(0, 200) + '...');
+
+  let processed = content;
+
+  // 首先处理转义字符，确保换行符被正确识别
+  processed = processed.replace(/\\n/g, '\n');
+  processed = processed.replace(/\\"/g, '"');
+  processed = processed.replace(/\\t/g, '\t');
+
+  // 处理连在一起的Markdown内容，确保正确的换行分隔
+  // 例如：---## 一、 核心命理分析报告#### 1. 性格特质与教养指南
+  processed = processed.replace(/(---)(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, '$1\n$2\n$3');
+  processed = processed.replace(/(---)(#{1,6}[^#\n]+)/g, '$1\n$2');
+  processed = processed.replace(/(#{1,6}[^#\n]+)(#{1,6}[^#\n]+)/g, '$1\n$2');
+  
+  // 特别处理概览部分，确保在分隔符处截断
+  // 如果概览部分包含分隔符和后续内容，只保留概览部分
+  const overviewMatch = processed.match(/^([^]*?【命主信息概览】[^]*?手型[^]*?)(---.*)/s);
+  if (overviewMatch) {
+    const overviewPart = overviewMatch[1].trim();
+    const restPart = overviewMatch[2];
+    console.log('分离概览部分:', overviewPart);
+    console.log('剩余部分:', restPart.substring(0, 100) + '...');
+    // 只处理概览部分，其余部分单独处理
+    processed = overviewPart;
+  }
+
+  // 然后使用增强的混合Markdown标题处理
+  processed = processMixedMarkdownTitles(processed);
+
+  // 然后处理特殊的知识卡格式
+  // 1. 处理【命主信息概览】格式 - 确保正确的样式
+  processed = processed.replace(/<h2[^>]*>【命主信息概览】<\/h2>/g, '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide">【命主信息概览】</h2>');
+  processed = processed.replace(/<h2[^>]*>命主信息概览<\/h2>/g, '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide">【命主信息概览】</h2>');
+  
+  // 2. 处理一级标题 - 确保正确的样式
+  processed = processed.replace(/<h2[^>]*>一、\s*核心命理分析报告<\/h2>/g, '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide">一、 核心命理分析报告</h2>');
+  processed = processed.replace(/<h2[^>]*>核心命理分析报告<\/h2>/g, '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide">一、 核心命理分析报告</h2>');
+  
+  processed = processed.replace(/<h2[^>]*>二、\s*天赋挖掘与成长建议<\/h2>/g, '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide">二、 天赋挖掘与成长建议</h2>');
+  processed = processed.replace(/<h2[^>]*>天赋挖掘与成长建议<\/h2>/g, '<h2 class="text-xl font-bold text-amber-900 mb-3 mt-5 first:mt-0 border-b border-amber-300 pb-2 tracking-wide">二、 天赋挖掘与成长建议</h2>');
+  
+  // 3. 处理二级标题 - 确保正确的样式
+  processed = processed.replace(/<h3[^>]*>【玄机子大师结语】<\/h3>/g, '<h3 class="text-lg font-semibold text-amber-800 mb-2 mt-4 first:mt-0 tracking-wide">【玄机子大师结语】</h3>');
+  processed = processed.replace(/<h3[^>]*>玄机子大师结语<\/h3>/g, '<h3 class="text-lg font-semibold text-amber-800 mb-2 mt-4 first:mt-0 tracking-wide">【玄机子大师结语】</h3>');
+  
+  // 4. 处理三级标题 - 确保正确的样式
+  processed = processed.replace(/<h4[^>]*>1\.\s*性格特质与教养指南\s*\(天性之根\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">1. 性格特质与教养指南 (天性之根)</h4>');
+  processed = processed.replace(/<h4[^>]*>性格特质与教养指南\s*\(天性之根\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">1. 性格特质与教养指南 (天性之根)</h4>');
+  processed = processed.replace(/<h4[^>]*>性格特质与教养指南<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">1. 性格特质与教养指南 (天性之根)</h4>');
+  
+  processed = processed.replace(/<h4[^>]*>2\.\s*潜在天赋深掘\s*\(天赋之苗\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">2. 潜在天赋深掘 (天赋之苗)</h4>');
+  processed = processed.replace(/<h4[^>]*>潜在天赋深掘\s*\(天赋之苗\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">2. 潜在天赋深掘 (天赋之苗)</h4>');
+  processed = processed.replace(/<h4[^>]*>潜在天赋深掘<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">2. 潜在天赋深掘 (天赋之苗)</h4>');
+  
+  processed = processed.replace(/<h4[^>]*>3\.\s*成长关键节点\s*\(成长之路\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">3. 成长关键节点 (成长之路)</h4>');
+  processed = processed.replace(/<h4[^>]*>成长关键节点\s*\(成长之路\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">3. 成长关键节点 (成长之路)</h4>');
+  processed = processed.replace(/<h4[^>]*>成长关键节点<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">3. 成长关键节点 (成长之路)</h4>');
+  
+  // 5. 处理天赋挖掘部分的四级标题
+  processed = processed.replace(/<h4[^>]*>1\.\s*地域适配建议\s*\(地利之选\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">1. 地域适配建议 (地利之选)</h4>');
+  processed = processed.replace(/<h4[^>]*>地域适配建议\s*\(地利之选\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">1. 地域适配建议 (地利之选)</h4>');
+  processed = processed.replace(/<h4[^>]*>地域适配建议<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">1. 地域适配建议 (地利之选)</h4>');
+  
+  processed = processed.replace(/<h4[^>]*>2\.\s*学业方向指引\s*\(文理之道\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">2. 学业方向指引 (文理之道)</h4>');
+  processed = processed.replace(/<h4[^>]*>学业方向指引\s*\(文理之道\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">2. 学业方向指引 (文理之道)</h4>');
+  processed = processed.replace(/<h4[^>]*>学业方向指引<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">2. 学业方向指引 (文理之道)</h4>');
+  
+  processed = processed.replace(/<h4[^>]*>3\.\s*兴趣培养清单\s*\(怡情之艺\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">3. 兴趣培养清单 (怡情之艺)</h4>');
+  processed = processed.replace(/<h4[^>]*>兴趣培养清单\s*\(怡情之艺\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">3. 兴趣培养清单 (怡情之艺)</h4>');
+  processed = processed.replace(/<h4[^>]*>兴趣培养清单<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">3. 兴趣培养清单 (怡情之艺)</h4>');
+  
+  processed = processed.replace(/<h4[^>]*>4\.\s*未来行业适配参考\s*\(成事之途\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">4. 未来行业适配参考 (成事之途)</h4>');
+  processed = processed.replace(/<h4[^>]*>未来行业适配参考\s*\(成事之途\)<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">4. 未来行业适配参考 (成事之途)</h4>');
+  processed = processed.replace(/<h4[^>]*>未来行业适配参考<\/h4>/g, '<h4 class="text-base font-semibold text-amber-800 mb-2 mt-3 first:mt-0 tracking-wide">4. 未来行业适配参考 (成事之途)</h4>');
+  
+  // 6. 处理分隔线（包括混合在标题中的情况）
+  processed = processed.replace(/^---\s*$/gm, '<hr class="my-6 border-t border-amber-300">');
+  // 处理分隔符+标题的情况，确保分隔符被正确识别
+  processed = processed.replace(/^---\s*(#{1,6}[^#\n]+)/gm, (match, title) => {
+    const level = (title.match(/#/g) || []).length;
+    const titleHtml = convertSingleTitle(title, level);
+    return `<hr class="my-6 border-t border-amber-300">\n${titleHtml}`;
+  });
+  
+  // 7. 处理列表项中的粗体格式（支持多种变体）
+  processed = processed.replace(/\*\s*\*\*([^*]+)\*\*\s*[：:]/g, '<li class="text-gray-700 text-sm leading-relaxed pl-1"><strong class="font-semibold text-amber-800">$1</strong>：');
+  processed = processed.replace(/^\*\s*\*\*([^*]+)\*\*\s*[：:]/gm, '<li class="text-gray-700 text-sm leading-relaxed pl-1"><strong class="font-semibold text-amber-800">$1</strong>：');
+  
+  // 8. 处理段落内容
+  const lines = processed.split('\n');
+  const processedLines = lines.map(line => {
+    const trimmed = line.trim();
+    
+    // 跳过已经是HTML标签的行
+    if (trimmed.startsWith('<h') || trimmed.startsWith('<hr') || trimmed.startsWith('<li')) {
+      return line;
+    }
+    
+    // 跳过空行
+    if (!trimmed) {
+      return '<br>';
+    }
+    
+    // 处理普通段落
+    return `<p class="mb-3 text-gray-700 leading-relaxed text-sm">${trimmed}</p>`;
+  });
+  
+  processed = processedLines.join('\n');
+  
+  // 9. 包装在容器中
+  processed = `<div class="knowledge-card-content">${processed}</div>`;
+  
+  console.log('知识卡格式处理完成');
+  return processed;
+}
+
+/**
  * 智能内容处理：自动检测格式并转换（展示所有content数据，不过滤）
  * @param content - 内容文本
  * @returns 处理后的HTML字符串
@@ -486,6 +761,25 @@ export function smartContentProcess(content: string): string {
   processedContent = processedContent.replace(/\\t/g, '\t'); // 处理转义的制表符
   
   console.log('处理转义字符后的内容:', processedContent);
+
+  // 检测知识卡格式 - 优先使用专门的知识卡格式处理
+  if (processedContent.includes('【命主信息概览】') || 
+      processedContent.includes('核心命理分析报告') ||
+      processedContent.includes('天赋挖掘与成长建议') ||
+      processedContent.includes('玄机子大师结语') ||
+      processedContent.includes('性格特质与教养指南') ||
+      processedContent.includes('潜在天赋深掘') ||
+      processedContent.includes('成长关键节点') ||
+      processedContent.includes('地域适配建议') ||
+      processedContent.includes('学业方向指引') ||
+      processedContent.includes('兴趣培养清单') ||
+      processedContent.includes('未来行业适配参考') ||
+      // 检测Markdown标题格式
+      (processedContent.includes('##') && processedContent.includes('####'))) {
+    
+    console.log('检测到知识卡格式，使用专门处理');
+    return processKnowledgeCardFormat(processedContent);
+  }
 
   // 检测并处理Markdown格式
   if (isMarkdownFormat(processedContent) || 
@@ -663,7 +957,7 @@ export function cleanCozeNoise(original: string): string {
 }
 
 /**
- * 更鲁棒地从混杂文本中提取“【命主信息概览】”片段
+ * 更鲁棒地从混杂文本中提取"【命主信息概览】"片段
  * - 先清理噪声
  * - 优先匹配带 Markdown 标题的写法：^##\s*【命主信息概览】
  * - 其次匹配不带 ## 的纯中文标题：^\s*【命主信息概览】
@@ -685,8 +979,18 @@ export function extractOverviewSection(raw: string): string {
   const plainTitle = text.search(/^\s*【命主信息概览】\s*$/m);
   if (plainTitle !== -1) {
     const after = text.slice(plainTitle);
-    const stopMatch = after.match(/^##\s+|^###\s+|^---\s*$/m);
+    // 更精确的停止条件：遇到分隔符、下一个主要章节或分析报告标题
+    const stopMatch = after.match(/^---\s*$|^---\s*##\s+|^##\s+一、|^##\s+核心命理分析报告|^###\s+二、|^###\s+天赋挖掘与成长建议/m);
     const body = stopMatch ? after.slice(0, stopMatch.index ?? 0) : after;
+    
+    // 如果找到了停止点，只取到分隔符之前的内容
+    if (stopMatch && stopMatch[0].includes('---')) {
+      const beforeSeparator = body.split('---')[0];
+      const result = beforeSeparator.trim().startsWith('##') ? beforeSeparator.trim() : `## 【命主信息概览】\n${beforeSeparator.trim()}`;
+      console.log('提取的概览内容（分隔符前）:', result);
+      return result;
+    }
+    
     return body.trim().startsWith('##') ? body.trim() : `## 【命主信息概览】\n${body.trim()}`;
   }
 

@@ -155,8 +155,8 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         });
       }
       
-      // 显示分析内容 - 显示完整的报告内容
-      if (analysisContent) {
+      // 显示分析内容 - 显示完整的报告内容（仅在非深度咨询模式下）
+      if (analysisContent && !isDeepTalk) {
         // 如果analysisContent包含完整的报告内容，直接使用
         // 否则生成完整的报告内容
         let fullReportContent = analysisContent;
@@ -244,8 +244,8 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         });
       }
       
-      // 显示Moonshot分析结果
-      if (moonshotResult) {
+      // 显示Moonshot分析结果（仅在非深度咨询模式下）
+      if (moonshotResult && !isDeepTalk) {
         // 直接使用HTML内容，不清理标签
         initialMessages.push({
           id: 'moonshot-result',
@@ -255,9 +255,9 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         });
       }
 
-      // 内联报告 iframe（若有）
-      if (inlineReportHtml) {
-        const iframeHtml = `<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body style=\"margin:0\">${inlineReportHtml}</body></html>`;
+      // 内联报告 iframe（若有）- 仅在深度咨询模式下显示
+      if (inlineReportHtml && isDeepTalk) {
+        const iframeHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0">${inlineReportHtml}</body></html>`;
         initialMessages.push({
           id: 'inline-report',
           content: iframeHtml,
@@ -816,27 +816,29 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       console.log('提取的助手内容:', assistantContent);
 
       if (assistantContent) {
-        // 可选：先提取“命主信息概览”并作为独立卡片插入
-        try {
-          const overviewMd = extractOverviewSection(assistantContent);
-          if (overviewMd && overviewMd.trim()) {
-            const overviewHtml = addMarkdownStyles(markdownToHtml(overviewMd));
-            setMessages(prev => {
-              const newMessages = [...prev];
-              // 在最后一条助手消息前插入概览卡
-              const idx = newMessages.length - 1;
-              const insertIndex = Math.max(0, idx);
-              newMessages.splice(insertIndex, 0, {
-                id: `overview-${Date.now()}`,
-                content: overviewHtml,
-                role: 'assistant',
-                timestamp: new Date(),
+        // 可选：先提取"命主信息概览"并作为独立卡片插入（仅在非深度咨询模式下）
+        if (!isDeepTalk) {
+          try {
+            const overviewMd = extractOverviewSection(assistantContent);
+            if (overviewMd && overviewMd.trim()) {
+              const overviewHtml = addMarkdownStyles(markdownToHtml(overviewMd));
+              setMessages(prev => {
+                const newMessages = [...prev];
+                // 在最后一条助手消息前插入概览卡
+                const idx = newMessages.length - 1;
+                const insertIndex = Math.max(0, idx);
+                newMessages.splice(insertIndex, 0, {
+                  id: `overview-${Date.now()}`,
+                  content: overviewHtml,
+                  role: 'assistant',
+                  timestamp: new Date(),
+                });
+                return newMessages;
               });
-              return newMessages;
-            });
+            }
+          } catch (error) {
+            console.log('概览提取失败:', error);
           }
-        } catch (error) {
-          console.log('概览提取失败:', error);
         }
 
         setMessages(prev => {
