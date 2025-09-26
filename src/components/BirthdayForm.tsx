@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getCozeConfig, validateCozeConfig } from '@/lib/coze-config';
+import { useIsMobile } from '@/hooks/use-mobile';
 import CozeChatWidget from './CozeChatWidget';
 import CozeAnalysisResult from './CozeAnalysisResult';
 import CozeStreamChat from './CozeStreamChat';
@@ -32,6 +33,7 @@ interface FormData {
 
 const BirthdayForm = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   // 生成默认出生日期（当前日期往前推20年）
   const getDefaultBirthDate = () => {
@@ -315,11 +317,11 @@ const BirthdayForm = () => {
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-8 bg-amber-900 relative">
+    <div className={`w-full h-full flex items-center justify-center ${isMobile ? 'p-4' : 'p-8'} bg-amber-900 relative`}>
       {/* Back Button */}
       <Link
         to="/"
-        className="absolute top-4 left-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors flex items-center gap-2"
+        className={`absolute top-4 left-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors flex items-center gap-2 ${isMobile ? 'text-xs' : 'text-sm'}`}
       >
         <ArrowLeft className="w-5 h-5 text-white" />
         <span className="text-white text-sm">返回上一页</span>
@@ -333,10 +335,10 @@ const BirthdayForm = () => {
           <Sparkles className="w-4 h-4 text-white" />
           <span className="text-white text-sm">开发者选项</span>
         </Link> */}
-      <Card className="bg-yellow-50 backdrop-blur-sm shadow-xl border-0 rounded-2xl w-full max-w-md">
-        <CardContent className="p-6 space-y-4">
+      <Card className={`bg-yellow-50 backdrop-blur-sm shadow-xl border-0 rounded-2xl w-full ${isMobile ? 'max-w-full' : 'max-w-md'}`}>
+        <CardContent className={`${isMobile ? 'p-4' : 'p-6'} space-y-4`}>
           {/* Gender and Calendar Type - First Row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
             <div className="space-y-1">
               <Label className="text-gray-600 font-normal text-sm">性别</Label>
               <Select value={formData.gender} onValueChange={(value) => updateFormData('gender', value)}>
@@ -499,7 +501,7 @@ const BirthdayForm = () => {
           </div>
 
           {/* Birth Location - Fifth Row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
             <div className="space-y-1">
               <Label className="text-gray-600 font-normal text-sm flex items-center gap-1">
                 出生地
@@ -615,7 +617,7 @@ const BirthdayForm = () => {
             <Button 
               onClick={handleSubmit}
               disabled={!isFormComplete()}
-              className={`w-full rounded-2xl h-11 text-base font-medium shadow-md transition-all duration-200 border-2 ${
+              className={`w-full rounded-2xl ${isMobile ? 'h-12' : 'h-11'} ${isMobile ? 'text-lg' : 'text-base'} font-medium shadow-md transition-all duration-200 border-2 ${
                 isFormComplete() 
                   ? 'bg-amber-700 hover:bg-amber-800 hover:shadow-lg text-amber-100 border-amber-600' 
                   : 'bg-gray-300 hover:bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed'

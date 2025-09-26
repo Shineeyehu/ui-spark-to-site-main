@@ -3,11 +3,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { getCozeConfig, validateCozeConfig } from '@/lib/coze-config';
+import { useIsMobile } from '@/hooks/use-mobile';
 import CozeV3Chat from '@/components/CozeV3Chat';
 import ReauthPrompt from '@/components/ReauthPrompt';
 
 const DeepTalkPage = () => {
   const location = useLocation();
+  const isMobile = useIsMobile();
   
   // 显示控制状态
   const [showContent, setShowContent] = useState(false);
@@ -128,9 +130,9 @@ const DeepTalkPage = () => {
 
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex">
-      {/* Left Half - Traditional Image */}
-      <div className="w-1/2 relative">
+    <div className={`min-h-screen relative overflow-hidden ${isMobile ? 'flex flex-col' : 'flex'}`}>
+      {/* Image Section */}
+      <div className={`${isMobile ? 'w-full h-48' : 'w-1/2'} relative`}>
         <img
           src="/lovable-uploads/84050b0e-37d1-49be-82ca-b7f81a82e2ae.png"
           alt="Traditional Chinese Wisdom Background"
@@ -140,8 +142,8 @@ const DeepTalkPage = () => {
         />
       </div>
       
-      {/* Right Half - Chat Interface */}
-      <div className="w-1/2 relative" style={{ backgroundColor: '#9c5537' }}>
+      {/* Chat Interface Section */}
+      <div className={`${isMobile ? 'w-full flex-1' : 'w-1/2'} relative`} style={{ backgroundColor: '#9c5537' }}>
         {/* Back Button */}
         <Link
           to="/report"
@@ -158,18 +160,18 @@ const DeepTalkPage = () => {
           <span style={{ color: '#8B4513' }} className="text-sm">返回报告</span>
         </Link>
 
-        <div className="flex items-center justify-center min-h-screen p-6 pt-16">
-          <div className="w-full max-w-3xl">
+        <div className={`flex items-center justify-center ${isMobile ? 'min-h-[calc(100vh-12rem)]' : 'min-h-screen'} ${isMobile ? 'p-4 pt-12' : 'p-6 pt-16'}`}>
+          <div className={`w-full ${isMobile ? 'max-w-full' : 'max-w-3xl'}`}>
 
             {showContent && (
               <>
                 {/* 深度咨询大标题 */}
                 <div className="text-center mb-6">
-                  <h1 className="text-3xl font-bold text-white mb-2">深度咨询</h1>
+                  <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-white mb-2`}>深度咨询</h1>
                 </div>
 
                 {/* Chat Card */}
-                <Card className="shadow-xl border-4 rounded-3xl h-[700px] flex flex-col" style={{ backgroundColor: '#FFFFFF', borderColor: '#8B4513' }}>
+                <Card className={`shadow-xl border-4 rounded-3xl ${isMobile ? 'h-[500px]' : 'h-[700px]'} flex flex-col`} style={{ backgroundColor: '#FFFFFF', borderColor: '#8B4513' }}>
                   <CardContent className="p-6 flex-1 flex flex-col" style={{ backgroundColor: '#F8F4E6' }}>
                     {/* 智能体对话界面 */}
                     <div className="flex-1 flex flex-col min-h-0">

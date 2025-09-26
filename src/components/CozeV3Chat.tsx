@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, User, Bot, Loader2, ArrowDown } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import HTMLRenderErrorBoundary from './HTMLRenderErrorBoundary';
 import { extractOverviewSection, markdownToHtml, addMarkdownStyles } from '@/lib/markdown-utils';
 
@@ -69,6 +70,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMobile = useIsMobile();
 
   const scrollToBottom = () => {
     // 使用 setTimeout 确保 DOM 更新后再滚动
@@ -987,12 +989,12 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       {/* 聊天消息区域 */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 bg-gradient-to-b from-amber-50 to-yellow-50 scroll-smooth overscroll-contain scrollbar-thin scrollbar-track-amber-100 scrollbar-thumb-amber-300 hover:scrollbar-thumb-amber-400 relative"
+        className={`flex-1 overflow-y-auto overflow-x-hidden ${isMobile ? 'p-2' : 'p-4'} space-y-4 bg-gradient-to-b from-amber-50 to-yellow-50 scroll-smooth overscroll-contain scrollbar-thin scrollbar-track-amber-100 scrollbar-thumb-amber-300 hover:scrollbar-thumb-amber-400 relative`}
         style={{ 
           scrollBehavior: 'smooth',
           WebkitOverflowScrolling: 'touch', // 移动端平滑滚动
-          minHeight: '300px', // 确保最小高度
-          maxHeight: 'calc(100vh - 300px)' // 为输入框预留更多空间
+          minHeight: isMobile ? '200px' : '300px', // 确保最小高度
+          maxHeight: isMobile ? 'calc(100vh - 200px)' : 'calc(100vh - 300px)' // 为输入框预留更多空间
         }}
         tabIndex={0} // 支持键盘导航
         onKeyDown={(e) => {
@@ -1351,7 +1353,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       )}
 
       {/* 输入区域 */}
-      <div className="border-t border-amber-200 bg-white p-4">
+      <div className={`border-t border-amber-200 bg-white ${isMobile ? 'p-2' : 'p-4'}`}>
         {/* 调试信息 - 生产环境已注释 */}
         {/* {process.env.NODE_ENV === 'development' && (
           <div className="mb-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
@@ -1359,25 +1361,26 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
           </div>
         )} */}
         
-        <div className="flex gap-2">
+        <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-2`}>
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="请输入您的问题..."
-            className="flex-1 border-amber-300 focus:border-amber-500"
+            className={`${isMobile ? 'w-full' : 'flex-1'} border-amber-300 focus:border-amber-500 ${isMobile ? 'h-12' : ''}`}
             disabled={isLoading}
             autoFocus
           />
           <Button
             onClick={sendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className="bg-amber-600 hover:bg-amber-700 text-white"
+            className={`bg-amber-600 hover:bg-amber-700 text-white ${isMobile ? 'w-full h-12' : ''}`}
           >
             <Send className="w-4 h-4" />
+            {isMobile && <span className="ml-2">发送</span>}
           </Button>
         </div>
-        <p className="text-xs text-gray-500 mt-2 text-center">
+        <p className={`text-xs text-gray-500 mt-2 text-center ${isMobile ? 'hidden' : ''}`}>
           按 Enter 发送消息，Shift + Enter 换行
         </p>
       </div>

@@ -7,6 +7,7 @@ import { Link, useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useMoonshot } from '@/hooks/use-moonshot';
 import { useCozeStream } from '@/hooks/use-coze-stream';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { smartContentProcess, addMarkdownStyles, markdownToHtml, extractOverviewSection, cleanCozeNoise, stripOverviewFromHtml } from '@/lib/markdown-utils';
 import { generateKnowledgeCardHTML, extractKnowledgeCardData, generateOverviewHTML, generateRemainingContentHTML } from '@/lib/knowledge-card-processor';
 import { logEnvironmentStatus } from '@/utils/env-checker';
@@ -21,6 +22,7 @@ const ReportPage = () => {
   const [showAnalyzeHint, setShowAnalyzeHint] = useState(true);
   const [showInitialLoading, setShowInitialLoading] = useState(true);
   const location = useLocation();
+  const isMobile = useIsMobile();
   
   // 使用Moonshot API Hook
   const {
@@ -475,9 +477,9 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
   }, [moonshotState.generatedHTML, overviewHtml, finalBodyHtml, streamingBodyHtml, aiBodyHtml]);
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex">
-      {/* Left Half - Traditional Image */}
-      <div className="w-1/2 relative">
+    <div className={`min-h-screen relative overflow-hidden ${isMobile ? 'flex flex-col' : 'flex'}`}>
+      {/* Image Section */}
+      <div className={`${isMobile ? 'w-full h-48' : 'w-1/2'} relative`}>
         <img
           src="/lovable-uploads/f809b3b5-d2c0-469f-9360-82e40e0ad5da.png"
           alt="Traditional Chinese Wisdom Background"
@@ -485,8 +487,8 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
         />
       </div>
       
-      {/* Right Half - Report Content */}
-      <div className="w-1/2 relative overflow-y-auto" style={{ backgroundColor: '#9c5537' }}>
+      {/* Report Content Section */}
+      <div className={`${isMobile ? 'w-full flex-1' : 'w-1/2'} relative overflow-y-auto`} style={{ backgroundColor: '#9c5537' }}>
         {/* Back Button */}
         <Link
           to="/birthday"
@@ -496,10 +498,10 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
           <span className="text-amber-800 text-sm">返回上一页</span>
         </Link>
 
-        <div className="p-6 pt-16">
+        <div className={`${isMobile ? 'p-4 pt-12' : 'p-6 pt-16'}`}>
           {/* Header */}
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-white mb-4">解读报告卡</h1>
+            <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-white mb-4`}>解读报告卡</h1>
           </div>
 
           {/* 生成状态提示 - 在卡片上方 */}
@@ -526,7 +528,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
           )}
           
           {/* Main Report Card - Scrollable */}
-          <div className="bg-white rounded-2xl shadow-xl mx-4 max-h-[75vh] overflow-y-auto mb-4">
+          <div className={`bg-white rounded-2xl shadow-xl ${isMobile ? 'mx-2' : 'mx-4'} ${isMobile ? 'max-h-[60vh]' : 'max-h-[75vh]'} overflow-y-auto mb-4`}>
             {/* Card Header with Controls */}
             <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center rounded-t-2xl z-50 shadow-sm">
               <div className="flex items-center gap-2">
@@ -568,7 +570,7 @@ ${formData.palmReading ? '- 手相信息：已上传手相照片' : ''}
 
             {/* Card Content */}
             <div 
-              className="p-8 transition-transform duration-300 origin-top-left report-content"
+              className={`${isMobile ? 'p-4' : 'p-8'} transition-transform duration-300 origin-top-left report-content`}
               style={{ transform: `scale(${zoomLevel})` }}
             >
               {/* 概览优先展示：从当前可用文本中精准提取“命主信息概览” */}
