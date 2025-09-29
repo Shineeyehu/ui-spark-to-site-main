@@ -160,19 +160,19 @@ const DeepTalkPage = () => {
           <span style={{ color: '#8B4513' }} className="text-sm">返回报告</span>
         </Link>
 
-        <div className={`flex items-center justify-center ${isMobile ? 'min-h-[calc(100vh-12rem)]' : 'min-h-screen'} ${isMobile ? 'p-4 pt-12' : 'p-6 pt-16'}`}>
+        <div className={`flex items-center justify-center ${isMobile ? 'min-h-[calc(100vh-8rem)]' : 'min-h-screen'} ${isMobile ? 'p-2 pt-12' : 'p-6 pt-16'}`}>
           <div className={`w-full ${isMobile ? 'max-w-full' : 'max-w-3xl'}`}>
 
             {showContent && (
               <>
                 {/* 深度咨询大标题 */}
-                <div className="text-center mb-6">
-                  <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-white mb-2`}>深度咨询</h1>
+                <div className="text-center mb-4">
+                  <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-white mb-2`}>深度咨询</h1>
                 </div>
 
-                {/* Chat Card */}
-                <Card className={`shadow-xl border-4 rounded-3xl ${isMobile ? 'h-[500px]' : 'h-[700px]'} flex flex-col`} style={{ backgroundColor: '#FFFFFF', borderColor: '#8B4513' }}>
-                  <CardContent className="p-6 flex-1 flex flex-col" style={{ backgroundColor: '#F8F4E6' }}>
+                {/* Chat Card - 移动端优化高度 */}
+                <Card className={`shadow-xl border-4 rounded-3xl ${isMobile ? 'h-[calc(100vh-10rem)]' : 'h-[700px]'} flex flex-col`} style={{ backgroundColor: '#FFFFFF', borderColor: '#8B4513' }}>
+                  <CardContent className={`${isMobile ? 'p-3' : 'p-6'} flex-1 flex flex-col`} style={{ backgroundColor: '#F8F4E6' }}>
                     {/* 智能体对话界面 */}
                     <div className="flex-1 flex flex-col min-h-0">
                       {/* 重新授权提示 */}

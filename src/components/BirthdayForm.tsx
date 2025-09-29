@@ -89,8 +89,30 @@ const BirthdayForm = () => {
   const cozeConfig = getCozeConfig();
   const configStatus = validateCozeConfig(cozeConfig);
 
+  // 自动计算年龄函数
+  const calculateAge = (birthDate: string): string => {
+    if (!birthDate) return '';
+    const today = new Date();
+    const birth = new Date(birthDate);
+    if (isNaN(birth.getTime())) return '';
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return Math.max(0, age).toString();
+  };
+
   const updateFormData = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      // 当出生日期改变时，自动计算年龄
+      if (field === 'birthDate' && value) {
+        const calculatedAge = calculateAge(value);
+        newData.age = calculatedAge;
+      }
+      return newData;
+    });
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -565,7 +587,9 @@ const BirthdayForm = () => {
 
           {/* Age - Sixth Row */}
           <div className="space-y-1">
-            <Label className="text-gray-600 font-normal text-sm">年龄</Label>
+            <Label className="text-gray-600 font-normal text-sm">
+              年龄
+            </Label>
             <Input
               type="number"
               value={formData.age}
@@ -573,7 +597,7 @@ const BirthdayForm = () => {
               placeholder="20"
               min="1"
               max="120"
-              className={`w-full bg-gray-50 border-gray-200 rounded-lg h-10 text-gray-700 font-normal text-center ${errors.age ? 'border-red-400' : ''}`}
+              className={`w-full bg-gray-50 border-gray-200 rounded-lg h-10 text-gray-700 font-normal text-center ${errors.age ? 'border-red-400' : ''} ${formData.birthDate ? 'bg-amber-50 border-amber-200' : ''}`}
             />
             {errors.age && <p className="text-red-500 text-xs mt-1">{errors.age}</p>}
           </div>

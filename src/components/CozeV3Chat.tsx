@@ -267,6 +267,17 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
           timestamp: new Date(Date.now() + 1200)
         });
       }
+      
+      // 深度咨询模式下，如果没有内联报告但有分析内容，也要显示
+      if (isDeepTalk && analysisContent && !inlineReportHtml) {
+        // 直接使用完整的分析内容，与解读报告卡保持一致
+        initialMessages.push({
+          id: 'deep-talk-analysis',
+          content: analysisContent, // 使用完整的分析内容，不截取
+          role: 'assistant',
+          timestamp: new Date(Date.now() + 1000)
+        });
+      }
     } else {
       // 默认消息
       initialMessages.push({
@@ -285,19 +296,12 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
     });
     
     setMessages(initialMessages);
-  }, [formData, analysisContent, moonshotResult]);
+  }, [formData, analysisContent, moonshotResult, inlineReportHtml, isDeepTalk]);
 
   const sendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
     
-    // 调试信息：显示当前配置
-    console.log('当前配置状态:', {
-      useJWT,
-      hasToken: !!token,
-      tokenPrefix: token ? token.substring(0, 10) + '...' : 'null',
-      botId,
-      hasAuthService: !!authService
-    });
+    // 生产环境已移除详细调试信息
     
     // 获取有效的访问令牌
     let validToken = token;
@@ -592,24 +596,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         }
       }
 
-      console.log('第一步：发送扣子API消息请求:', {
-        url: 'https://api.coze.cn/v3/chat',
-        botId,
-        userId,
-        token: validToken.substring(0, 20) + '...',
-        fullToken: validToken, // 显示完整token用于调试
-        conversationHistoryLength: conversationHistory.length,
-        messageLength: requestBody.additional_messages[0].content.length,
-        contextInfoLength: contextInfo.length,
-        hasFormData: !!formData,
-        hasAnalysisContent: !!analysisContent,
-        hasMoonshotResult: !!moonshotResult,
-        recentMessagesCount: recentMessages.length,
-        useJWT,
-        hasAuthService: !!authService,
-        hasPalmImage: !!palmImageFileId,
-        palmImageFileId: palmImageFileId
-      });
+      // 生产环境已移除详细API请求日志
       
       // 检查请求体大小
       const requestBodySize = JSON.stringify(requestBody).length;
@@ -619,15 +606,22 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         // console.warn('请求体过大，可能导致API调用失败');
       }
 
+      // 移动端优化：增加超时处理和重试机制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+      
       const sendResponse = await fetch('https://api.coze.cn/v3/chat', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${validToken}`,
           'Content-Type': 'application/json',
-          'User-Agent': 'Coze-Client/1.0',
+          'User-Agent': 'Coze-Client/1.0'
         },
         body: JSON.stringify(requestBody),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!sendResponse.ok) {
         const errorText = await sendResponse.text();
@@ -636,12 +630,12 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       }
 
       const sendResponseText = await sendResponse.text();
-      console.log('发送消息API响应原始文本:', sendResponseText);
+      // 生产环境已移除详细响应日志
       
       let sendResponseData;
       try {
         sendResponseData = JSON.parse(sendResponseText);
-        console.log('发送消息API响应解析后的数据:', sendResponseData);
+        // 生产环境已移除详细解析日志
       } catch (parseError) {
         console.error('发送消息JSON解析失败:', parseError);
         throw new Error('发送消息API响应格式错误');
@@ -669,7 +663,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         throw new Error('未获取到必要的聊天ID');
       }
 
-      console.log('获取到聊天ID:', { chatId, conversationId });
+      // 生产环境已移除聊天ID日志
 
       // 第二步：轮询状态直到完成
       let status = 'in_progress';
@@ -678,7 +672,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       
       while (status === 'in_progress' && attempts < maxAttempts) {
         attempts++;
-        console.log(`第二步：轮询状态 (第${attempts}次)`, { chatId, conversationId });
+        // 生产环境已移除轮询状态日志
         
         await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
         
@@ -696,12 +690,12 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         }
 
         const retrieveResponseText = await retrieveResponse.text();
-        console.log('轮询状态API响应:', retrieveResponseText);
+        // 生产环境已移除轮询响应日志
         
         try {
           const retrieveData = JSON.parse(retrieveResponseText);
           status = retrieveData.data.status;
-          console.log('当前状态:', status);
+          // 生产环境已移除状态日志
           
           if (retrieveData.code && retrieveData.code !== 0) {
             // console.error('轮询状态扣子API错误:', retrieveData.msg);
@@ -718,7 +712,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         throw new Error(`消息处理超时，状态: ${status}`);
       }
 
-      console.log('消息处理完成，开始获取回复内容');
+      // 生产环境已移除处理完成日志
 
       // 第三步：获取回复内容
       const messageListResponse = await fetch(`https://api.coze.cn/v3/chat/message/list?chat_id=${chatId}&conversation_id=${conversationId}`, {
@@ -736,12 +730,12 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
       }
 
       const messageListResponseText = await messageListResponse.text();
-      console.log('获取消息列表API响应原始文本:', messageListResponseText);
+      // 生产环境已移除消息列表响应日志
       
       let messageListData;
       try {
         messageListData = JSON.parse(messageListResponseText);
-        console.log('获取消息列表API响应解析后的数据:', messageListData);
+        // 生产环境已移除消息列表解析日志
       } catch (parseError) {
         console.error('获取消息列表JSON解析失败:', parseError);
         throw new Error('获取消息列表API响应格式错误');
@@ -769,7 +763,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
           return true;
         });
         
-        console.log('过滤后的有效消息:', validMessages);
+        // 生产环境已移除有效消息日志
         
         // 查找助手消息，优先查找type为answer的消息
         let assistantMessage = validMessages.find(msg => msg.type === 'answer');
@@ -783,7 +777,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
           // 尝试解析JSON内容
           try {
             const parsedContent = JSON.parse(assistantMessage.content);
-            console.log('解析后的消息内容:', parsedContent);
+            // 生产环境已移除消息内容解析日志
             
             // 如果是JSON格式，提取实际文本内容
             if (parsedContent.msg_type && parsedContent.data) {
@@ -815,7 +809,23 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         }
       }
 
-      console.log('提取的助手内容:', assistantContent);
+      // 生产环境已移除助手内容日志
+
+      // 检查是否包含手相照片缺失的错误信息
+      if (assistantContent && assistantContent.includes('无法获取手相照片信息')) {
+        // 生产环境已移除手相照片错误日志
+        // 直接显示错误信息，不进行其他处理
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMessage = newMessages[newMessages.length - 1];
+          if (lastMessage && lastMessage.role === 'assistant') {
+            lastMessage.content = assistantContent;
+          }
+          return newMessages;
+        });
+        scrollToBottom();
+        return;
+      }
 
       if (assistantContent) {
         // 可选：先提取"命主信息概览"并作为独立卡片插入（仅在非深度咨询模式下）
@@ -856,6 +866,24 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         scrollToBottom();
       } else {
         console.warn('无法从响应中提取内容，完整响应:', messageListData);
+        
+        // 检查原始响应是否包含手相照片缺失的错误信息
+        const rawResponse = JSON.stringify(messageListData);
+        if (rawResponse.includes('无法获取手相照片信息')) {
+          // 生产环境已移除原始响应错误日志
+          const errorMessage = '您好，目前无法获取手相照片信息，无法完成手相分析。为了能为您的孩子进行"天地双盘+手相，参合互证"的深度分析，请您重新提供有效的手相照片信息。';
+          
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMessage = newMessages[newMessages.length - 1];
+            if (lastMessage && lastMessage.role === 'assistant') {
+              lastMessage.content = errorMessage;
+            }
+            return newMessages;
+          });
+          scrollToBottom();
+          return;
+        }
         
         // 根据问题类型生成智能回复作为后备
         let mockResponse = '';
@@ -899,14 +927,32 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         
         // 滚动到底部
         scrollToBottom();
-        console.log('使用智能模拟回复作为后备');
+        // 生产环境已移除智能模拟回复日志
       }
     } catch (err) {
       console.error('发送消息失败:', err);
       
+      // 移动端网络错误处理
+      if (err instanceof Error) {
+        // 生产环境已移除移动端错误详情日志
+        
+        if (err.name === 'AbortError') {
+          // 生产环境已移除超时日志
+          setError('网络请求超时，已为您生成智能回复');
+        } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          // 生产环境已移除网络连接失败日志
+          setError('网络连接失败，已为您生成智能回复');
+        } else if (err.message === 'TOKEN_EXPIRED') {
+          // 生产环境已移除令牌失效日志
+        } else if (isMobile && !navigator.onLine) {
+          // 生产环境已移除移动端离线状态日志
+          setError('网络连接异常，已为您生成智能回复');
+        }
+      }
+      
       // 如果是令牌失效，使用智能模拟回复
       if (err instanceof Error && err.message === 'TOKEN_EXPIRED') {
-        console.log('使用智能模拟回复作为后备');
+        // 生产环境已移除智能模拟回复日志
         
         // 根据问题类型生成智能回复
         let mockResponse = '';
@@ -950,7 +996,7 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         
         // 滚动到底部
         scrollToBottom();
-        console.log('智能模拟回复已生成');
+        // 生产环境已移除智能模拟回复生成日志
       } else {
         setError(err instanceof Error ? err.message : '发送消息失败');
         
@@ -967,10 +1013,10 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         scrollToBottom();
       }, 200);
       
-      // 额外的保护：确保输入框可见
+      // 额外的保护：确保输入框可见（移动端不自动聚焦）
       setTimeout(() => {
         const inputElement = document.querySelector('input[placeholder="请输入您的问题..."]') as HTMLInputElement;
-        if (inputElement) {
+        if (inputElement && !isMobile) {
           inputElement.focus();
         }
       }, 300);
@@ -993,8 +1039,8 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         style={{ 
           scrollBehavior: 'smooth',
           WebkitOverflowScrolling: 'touch', // 移动端平滑滚动
-          minHeight: isMobile ? '200px' : '300px', // 确保最小高度
-          maxHeight: isMobile ? 'calc(100vh - 200px)' : 'calc(100vh - 300px)' // 为输入框预留更多空间
+          minHeight: isMobile ? '350px' : '300px', // 移动端增加最小高度
+          maxHeight: isMobile ? 'calc(100vh - 120px)' : 'calc(100vh - 300px)' // 移动端优化高度，为加载状态留出空间
         }}
         tabIndex={0} // 支持键盘导航
         onKeyDown={(e) => {
@@ -1190,9 +1236,92 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
                      <div className="bg-white border-2 border-amber-200 rounded-xl overflow-hidden">
                       <iframe
                         srcDoc={message.content}
-                        className="w-full h-[420px]"
+                        className={`w-full ${isMobile ? 'h-[300px]' : 'h-[420px]'}`}
                         sandbox="allow-same-origin allow-scripts"
+                        style={{ 
+                          border: 'none',
+                          borderRadius: isMobile ? '8px' : '12px'
+                        }}
                       />
+                     </div>
+                   ) : message.id === 'deep-talk-analysis' ? (
+                     // 使用与解读报告卡完全相同的渲染方式
+                     <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-6 shadow-lg">
+                       <div className="flex items-center mb-4">
+                         <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center mr-3">
+                           <span className="text-white text-sm font-bold">📜</span>
+                         </div>
+                         <h3 className="text-lg font-bold text-amber-900">完整命理分析报告</h3>
+                       </div>
+                       
+                       <div className="max-h-80 overflow-y-auto bg-white/70 rounded-lg p-4 border border-amber-100">
+                         <div className="text-sm leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">
+                           {message.content.split('\n').map((line, index) => {
+                             // 处理Markdown格式
+                             if (line.startsWith('## ')) {
+                               return (
+                                 <div key={index} className="font-bold text-amber-900 text-lg mb-3 mt-4 first:mt-0 border-b border-amber-300 pb-1">
+                                   {line.replace(/## /, '')}
+                                 </div>
+                               );
+                             } else if (line.startsWith('#### ')) {
+                               return (
+                                 <div key={index} className="font-semibold text-amber-800 text-base mb-2 mt-3 flex items-center">
+                                   <span className="text-amber-600 mr-2">♥</span>
+                                   {line.replace(/#### /, '')}
+                                 </div>
+                               );
+                             } else if (line.startsWith('### ')) {
+                               return (
+                                 <div key={index} className="font-semibold text-amber-800 text-base mb-2 mt-3 flex items-center">
+                                   <span className="text-amber-600 mr-2">●</span>
+                                   {line.replace(/### /, '')}
+                                 </div>
+                               );
+                             } else if (line.startsWith('**') && line.endsWith('**')) {
+                               return (
+                                 <div key={index} className="font-semibold text-amber-800 mb-2 mt-3 first:mt-0">
+                                   {line.replace(/\*\*/g, '')}
+                                 </div>
+                               );
+                             } else if (line.startsWith('- ')) {
+                               return (
+                                 <div key={index} className="ml-4 mb-1 flex items-start">
+                                   <span className="text-amber-600 mr-2">•</span>
+                                   <span>{line.substring(2)}</span>
+                                 </div>
+                               );
+                             } else if (line.startsWith('  - ')) {
+                               return (
+                                 <div key={index} className="ml-8 mb-1 flex items-start">
+                                   <span className="text-amber-500 mr-2">✈</span>
+                                   <span>{line.substring(4)}</span>
+                                 </div>
+                               );
+                             } else if (line.startsWith('---')) {
+                               return <hr key={index} className="my-3 border-amber-200" />;
+                             } else if (line.startsWith('*') && line.endsWith('*')) {
+                               return (
+                                 <div key={index} className="text-xs text-gray-500 italic mt-2">
+                                   {line.replace(/\*/g, '')}
+                                 </div>
+                               );
+                             } else if (line.trim() === '') {
+                               return <br key={index} />;
+                             } else {
+                               return (
+                                 <div key={index} className="mb-1 text-sm leading-relaxed">
+                                   {line}
+                                 </div>
+                               );
+                             }
+                           })}
+                         </div>
+                       </div>
+                       
+                       <div className="mt-4 text-xs text-amber-700 bg-amber-100 rounded-lg p-2">
+                         💡 您可以基于此报告内容向玄机子提问，获得更深入的解读
+                       </div>
                      </div>
                    ) : (
                      <div className="text-sm leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">
@@ -1310,13 +1439,22 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         ))}
         
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-white text-gray-800 shadow-md border border-amber-200 rounded-lg px-4 py-2">
-              <div className="flex items-center gap-2">
-                <Bot className="w-5 h-5 text-amber-600" />
-                <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
-                <span className="text-sm text-gray-600">正在思考中...</span>
+          <div className={`flex justify-start mb-4 relative ${isMobile ? 'z-30' : 'z-20'} ${isMobile ? 'mb-6' : ''}`}>
+            <div className={`bg-white text-gray-800 shadow-xl border-2 border-amber-200 rounded-xl ${isMobile ? 'px-4 py-4 mx-2' : 'px-4 py-2'} w-full max-w-sm relative ${isMobile ? 'z-30' : 'z-20'} ${isMobile ? 'transform translate-y-0' : ''} ${isMobile ? 'ring-2 ring-amber-300' : ''}`}>
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <Bot className={`${isMobile ? 'w-7 h-7' : 'w-5 h-5'} text-amber-600`} />
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <Loader2 className={`${isMobile ? 'w-6 h-6' : 'w-4 h-4'} animate-spin text-amber-600`} />
+                  <span className={`${isMobile ? 'text-lg font-medium' : 'text-sm'} text-gray-700`}>正在思考中...</span>
+                </div>
               </div>
+              {isMobile && (
+                <div className="mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1">
+                  💡 AI正在分析您的问题，请稍候...
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1352,14 +1490,9 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
         </div>
       )}
 
-      {/* 输入区域 */}
-      <div className={`border-t border-amber-200 bg-white ${isMobile ? 'p-2' : 'p-4'}`}>
-        {/* 调试信息 - 生产环境已注释 */}
-        {/* {process.env.NODE_ENV === 'development' && (
-          <div className="mb-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
-            {debugInfo}
-          </div>
-        )} */}
+      {/* 输入区域 - 移动端优化 */}
+      <div className={`border-t border-amber-200 bg-white ${isMobile ? 'p-3' : 'p-4'} ${isMobile ? 'sticky bottom-0 z-10' : ''}`}>
+        {/* 调试信息 - 生产环境已移除 */}
         
         <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-2`}>
           <Input
@@ -1367,14 +1500,14 @@ const CozeV3Chat: React.FC<CozeV3ChatProps> = ({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="请输入您的问题..."
-            className={`${isMobile ? 'w-full' : 'flex-1'} border-amber-300 focus:border-amber-500 ${isMobile ? 'h-12' : ''}`}
+            className={`${isMobile ? 'w-full' : 'flex-1'} border-amber-300 focus:border-amber-500 ${isMobile ? 'h-12 text-base' : ''}`}
             disabled={isLoading}
-            autoFocus
+            autoFocus={!isMobile} // 移动端不自动聚焦，避免键盘弹出
           />
           <Button
             onClick={sendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className={`bg-amber-600 hover:bg-amber-700 text-white ${isMobile ? 'w-full h-12' : ''}`}
+            className={`bg-amber-600 hover:bg-amber-700 text-white ${isMobile ? 'w-full h-12 text-base' : ''}`}
           >
             <Send className="w-4 h-4" />
             {isMobile && <span className="ml-2">发送</span>}

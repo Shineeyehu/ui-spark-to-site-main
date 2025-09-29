@@ -30,7 +30,7 @@ export const getCozeConfigSecure = async (): Promise<CozeConfig> => {
     // 直接返回默认配置，不再依赖 Supabase
     return {
       botId: '7546564367413379135',
-      token: 'cztei_qWuvWgYwcOQJ3ueTuzbytdrHwxRumNwJOTkFAl94W16W1FZlrbGeamRdnRODnL4hb',
+      token: 'pat_WJDhe5pLrsGYOyNuzTDJIQMuf3lSv5R6R0vjbb9qA448GceGAzzcRJCqz1cEzMlS',
       userId: 'user_' + Date.now(),
       nickname: '用户',
       useJWT: false // 暂时禁用JWT认证，使用静态token
@@ -40,7 +40,7 @@ export const getCozeConfigSecure = async (): Promise<CozeConfig> => {
     // 返回默认配置作为后备
     return {
       botId: '7546564367413379135',
-      token: 'cztei_qWuvWgYwcOQJ3ueTuzbytdrHwxRumNwJOTkFAl94W16W1FZlrbGeamRdnRODnL4hb',
+      token: 'pat_WJDhe5pLrsGYOyNuzTDJIQMuf3lSv5R6R0vjbb9qA448GceGAzzcRJCqz1cEzMlS',
       userId: 'user_' + Date.now(),
       nickname: '用户',
       useJWT: false // 暂时禁用JWT认证，使用静态token
@@ -58,7 +58,7 @@ export const getCozeConfig = (): CozeConfig => {
   
   // 如果有API Key，优先使用API Key而不是JWT
   const shouldUseJWT = useJWT && !envApiKey;
-  const finalToken = envApiKey || envToken || 'cztei_qWuvWgYwcOQJ3ueTuzbytdrHwxRumNwJOTkFAl94W16W1FZlrbGeamRdnRODnL4hb';
+  const finalToken = envApiKey || envToken || 'pat_WJDhe5pLrsGYOyNuzTDJIQMuf3lSv5R6R0vjbb9qA448GceGAzzcRJCqz1cEzMlS';
   
   // 生产环境已移除调试日志
   // console.log('Coze配置选择:', {
